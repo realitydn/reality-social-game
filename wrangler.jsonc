@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "reality-social-game",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-04-15",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "socialgame-state",
+      // Run `wrangler d1 create socialgame-state` and paste the returned id here.
+      "database_id": "REPLACE_AFTER_WRANGLER_D1_CREATE",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // R2 binding (uncomment after enabling R2 + creating bucket):
+  // "r2_buckets": [
+  //   {
+  //     "binding": "AVATARS",
+  //     "bucket_name": "reality-game-avatars"
+  //   }
+  // ],
+  "observability": { "enabled": true }
+}

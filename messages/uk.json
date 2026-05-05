@@ -1,0 +1,23 @@
+{
+  "home": {
+    "title": "Знайдіть когось у залі.",
+    "tagline": "Вечірка-гра, в яку грають наживо в REALITY. Оберіть гру, знайдіть гравця, набирайте очки."
+  },
+  "auth": {
+    "google": "Увійти через Google",
+    "guest": "Грати як гість сьогодні"
+  },
+  "profile": {
+    "heading": "Ваш профіль",
+    "displayName": "Ім'я для відображення",
+    "displayNamePlaceholder": "Як вас називати?",
+    "locale": "Мова",
+    "newsletter": "Надсилати розсилку REALITY",
+    "avatar": "Фото профілю",
+    "avatarComingSoon": "Фото профілю незабаром.",
+    "save": "Зберегти"
+  },
+  "footer": {
+    "address": "86 Mai Thúc Lân, Đà Nẵng"
+  }
+}

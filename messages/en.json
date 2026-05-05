@@ -1,0 +1,23 @@
+{
+  "home": {
+    "title": "Find someone in the room.",
+    "tagline": "A party game played in person at REALITY. Pick a game, find a player, score points."
+  },
+  "auth": {
+    "google": "Sign in with Google",
+    "guest": "Play as guest tonight"
+  },
+  "profile": {
+    "heading": "Your profile",
+    "displayName": "Display name",
+    "displayNamePlaceholder": "What should we call you?",
+    "locale": "Language",
+    "newsletter": "Send me the REALITY newsletter",
+    "avatar": "Profile photo",
+    "avatarComingSoon": "Profile photos coming soon.",
+    "save": "Save"
+  },
+  "footer": {
+    "address": "86 Mai Thúc Lân, Đà Nẵng"
+  }
+}

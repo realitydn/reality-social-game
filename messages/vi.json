@@ -1,0 +1,23 @@
+{
+  "home": {
+    "title": "Tìm một người trong phòng.",
+    "tagline": "Trò chơi tiệc tùng chơi trực tiếp tại REALITY. Chọn một trò, tìm người chơi, ghi điểm."
+  },
+  "auth": {
+    "google": "Đăng nhập bằng Google",
+    "guest": "Chơi với tư cách khách tối nay"
+  },
+  "profile": {
+    "heading": "Hồ sơ của bạn",
+    "displayName": "Tên hiển thị",
+    "displayNamePlaceholder": "Chúng tôi nên gọi bạn là gì?",
+    "locale": "Ngôn ngữ",
+    "newsletter": "Gửi cho tôi bản tin REALITY",
+    "avatar": "Ảnh hồ sơ",
+    "avatarComingSoon": "Ảnh hồ sơ sẽ sớm ra mắt.",
+    "save": "Lưu"
+  },
+  "footer": {
+    "address": "86 Mai Thúc Lân, Đà Nẵng"
+  }
+}
