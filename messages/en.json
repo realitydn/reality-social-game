@@ -17,6 +17,21 @@
     "avatarComingSoon": "Profile photos coming soon.",
     "save": "Save"
   },
+  "scan": {
+    "joiningHeading": "You're joining",
+    "countInRoom": "{count, plural, =0 {No one's here yet.} =1 {1 player in the room.} other {# players in the room.}}",
+    "displayName": "Your name tonight",
+    "displayNamePlaceholder": "What should we call you?",
+    "join": "Join",
+    "orSignInPrefix": "Have an account?",
+    "orSignInLink": "Sign in with Google"
+  },
+  "player": {
+    "youreIn": "You're in",
+    "playingAs": "Playing as",
+    "gamesComingSoon": "Games launch in Phase 2 — sit tight.",
+    "inTheRoom": "In the room ({count})"
+  },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"
   }

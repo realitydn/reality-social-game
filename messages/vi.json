@@ -17,6 +17,21 @@
     "avatarComingSoon": "Ảnh hồ sơ sẽ sớm ra mắt.",
     "save": "Lưu"
   },
+  "scan": {
+    "joiningHeading": "Bạn đang tham gia",
+    "countInRoom": "{count, plural, =0 {Chưa có ai.} =1 {1 người chơi trong phòng.} other {# người chơi trong phòng.}}",
+    "displayName": "Tên của bạn tối nay",
+    "displayNamePlaceholder": "Chúng tôi nên gọi bạn là gì?",
+    "join": "Tham gia",
+    "orSignInPrefix": "Đã có tài khoản?",
+    "orSignInLink": "Đăng nhập bằng Google"
+  },
+  "player": {
+    "youreIn": "Bạn đang ở trong",
+    "playingAs": "Chơi với tên",
+    "gamesComingSoon": "Trò chơi sẽ ra mắt ở giai đoạn 2 — chờ chút nhé.",
+    "inTheRoom": "Trong phòng ({count})"
+  },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"
   }

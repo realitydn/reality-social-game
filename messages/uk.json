@@ -17,6 +17,21 @@
     "avatarComingSoon": "Фото профілю незабаром.",
     "save": "Зберегти"
   },
+  "scan": {
+    "joiningHeading": "Ви приєднуєтеся до",
+    "countInRoom": "{count, plural, =0 {Ще нікого немає.} one {# гравець у залі.} few {# гравці у залі.} many {# гравців у залі.} other {# гравця у залі.}}",
+    "displayName": "Ваше ім'я на сьогодні",
+    "displayNamePlaceholder": "Як вас називати?",
+    "join": "Приєднатися",
+    "orSignInPrefix": "Уже маєте акаунт?",
+    "orSignInLink": "Увійти через Google"
+  },
+  "player": {
+    "youreIn": "Ви в",
+    "playingAs": "Граєте як",
+    "gamesComingSoon": "Ігри з'являться на етапі 2 — почекайте трохи.",
+    "inTheRoom": "У залі ({count})"
+  },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"
   }
