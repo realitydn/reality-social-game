@@ -4,16 +4,20 @@ import { useCallback, useEffect, useState } from "react";
 import BingoCard from "./BingoCard";
 import BingoPendingClaims from "./BingoPendingClaims";
 import TargetHuntView from "./TargetHuntView";
+import SpeedPairView from "./SpeedPairView";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
+import type { SpeedPairState } from "@/games/speed-pair/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { Locale } from "@/i18n/locales";
+
+type AnyGameState = BingoState | TargetHuntState | SpeedPairState;
 
 type Dashboard = {
   session: { id: string; name: string; ends_at: number | null };
   players: SessionPlayer[];
   game: { id: string; type: string; status: string } | null;
-  gameState: BingoState | TargetHuntState | null;
+  gameState: AnyGameState | null;
   scores: Record<string, number>;
   me: { user_id: string; code: string | null; display_name: string | null } | null;
 };
@@ -24,6 +28,7 @@ type Props = {
   locale: Locale;
   bingoLabels: Record<string, string>;
   targetHuntLabels: Record<string, string>;
+  speedPairLabels: Record<string, string>;
   pollMs?: number;
   noActiveGameMessage: string;
 };
@@ -34,6 +39,7 @@ export default function GameView({
   locale,
   bingoLabels,
   targetHuntLabels,
+  speedPairLabels,
   pollMs = 2500,
   noActiveGameMessage,
 }: Props) {
@@ -99,6 +105,11 @@ export default function GameView({
     [postEvent],
   );
 
+  const handleSpeedPairDone = useCallback(
+    () => postEvent({ kind: "speed_pair_done" }),
+    [postEvent],
+  );
+
   if (!data.game || !data.gameState || !data.me) {
     return (
       <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
@@ -143,6 +154,19 @@ export default function GameView({
         labels={targetHuntLabels}
         onTag={handleTag}
         onResolve={handleTagResolve}
+      />
+    );
+  }
+
+  if (data.game.type === "speed-pair") {
+    const state = data.gameState as SpeedPairState;
+    return (
+      <SpeedPairView
+        state={state}
+        meId={data.me.user_id}
+        players={data.players}
+        labels={speedPairLabels}
+        onDone={handleSpeedPairDone}
       />
     );
   }

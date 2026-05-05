@@ -7,6 +7,7 @@ import { getGameType } from "@/games/registry";
 import { promptIdAt } from "@/games/bingo/card";
 import type { BingoEvent, BingoState } from "@/games/bingo/state";
 import type { TargetHuntEvent, TargetHuntState } from "@/games/target-hunt/state";
+import type { SpeedPairEvent, SpeedPairState } from "@/games/speed-pair/state";
 
 type BingoClaimBody = {
   kind: "bingo_claim";
@@ -20,7 +21,13 @@ type TagResolveBody = {
   kind: "target_hunt_tag_confirm" | "target_hunt_tag_deny";
   claimId: string;
 };
-type EventBody = BingoClaimBody | BingoResolveBody | TagClaimBody | TagResolveBody;
+type SpeedPairDoneBody = { kind: "speed_pair_done" };
+type EventBody =
+  | BingoClaimBody
+  | BingoResolveBody
+  | TagClaimBody
+  | TagResolveBody
+  | SpeedPairDoneBody;
 
 export async function POST(
   req: NextRequest,
@@ -54,7 +61,6 @@ export async function POST(
     const expected = promptIdAt(game.session_id, game.id, user.id, body.squareIdx);
     if (expected !== body.promptId)
       return NextResponse.json({ error: "prompt mismatch" }, { status: 400 });
-
     const eventId = crypto.randomUUID();
     const event: BingoEvent = {
       kind: "bingo_claim",
@@ -155,6 +161,41 @@ export async function POST(
       targetId: null,
       payload: { claimId: body.claimId, confirmerId: user.id, at: now },
     });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ───────────── Speed Pair ─────────────
+  if (body.kind === "speed_pair_done") {
+    const state = (await getGameState(game)) as SpeedPairState;
+    const event: SpeedPairEvent = { kind: "speed_pair_done", playerId: user.id, at: now };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "speed_pair_done",
+      actorId: user.id,
+      targetId: null,
+      payload: { playerId: user.id, at: now },
+    });
+
+    // Re-read state and auto-pair from the head of the waiting queue while we
+    // have ≥2 ready. This keeps the matching logic out of the (pure) reducer.
+    let next = (await getGameState(game)) as SpeedPairState;
+    while (next.waiting.length >= 2) {
+      const a = next.waiting[0];
+      const b = next.waiting[1];
+      const assignAt = Date.now();
+      await appendEvent({
+        id: crypto.randomUUID(),
+        gameId: game.id,
+        kind: "speed_pair_assign",
+        actorId: null,
+        targetId: null,
+        payload: { players: [a, b], at: assignAt },
+      });
+      next = (await getGameState(game)) as SpeedPairState;
+    }
     return NextResponse.json({ ok: true });
   }
 

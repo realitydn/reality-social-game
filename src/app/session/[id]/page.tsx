@@ -5,8 +5,10 @@ import { getActiveGame, getGameState, getScores } from "@/lib/games";
 import { getCurrentUser } from "@/lib/session";
 import { BingoGame } from "@/games/bingo";
 import { TargetHuntGame } from "@/games/target-hunt";
+import { SpeedPairGame } from "@/games/speed-pair";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
+import type { SpeedPairState } from "@/games/speed-pair/state";
 import { isLocale, type Locale } from "@/i18n/locales";
 import GameView from "@/components/GameView";
 import AttendeeList from "@/components/AttendeeList";
@@ -28,7 +30,9 @@ export default async function PlayerSessionPage({
   const players = await listPlayers(id);
   const me = await getPlayer(id, user.id);
   const game = await getActiveGame(id);
-  const gameState = game ? ((await getGameState(game)) as BingoState | TargetHuntState) : null;
+  const gameState = game
+    ? ((await getGameState(game)) as BingoState | TargetHuntState | SpeedPairState)
+    : null;
   const scores = game ? await getScores(game) : {};
 
   const t = await getTranslations("player");
@@ -36,6 +40,7 @@ export default async function PlayerSessionPage({
   const locale: Locale = isLocale(localeRaw) ? localeRaw : "en";
   const bingoLabels = BingoGame.prompts(locale);
   const targetHuntLabels = TargetHuntGame.prompts(locale);
+  const speedPairLabels = SpeedPairGame.prompts(locale);
 
   const initialDashboard = {
     session: { id: session.id, name: session.name, ends_at: session.ends_at },
@@ -99,6 +104,7 @@ export default async function PlayerSessionPage({
             locale={locale}
             bingoLabels={bingoLabels}
             targetHuntLabels={targetHuntLabels}
+            speedPairLabels={speedPairLabels}
             noActiveGameMessage={t("noActiveGame")}
           />
         </div>
