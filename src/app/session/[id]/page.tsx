@@ -1,7 +1,12 @@
 import { notFound, redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
-import { getSession, listPlayers } from "@/lib/sessions";
+import { getLocale, getTranslations } from "next-intl/server";
+import { getSession, listPlayers, getPlayer } from "@/lib/sessions";
+import { getActiveGame, getGameState, getScores } from "@/lib/games";
 import { getCurrentUser } from "@/lib/session";
+import { BingoGame } from "@/games/bingo";
+import type { BingoState } from "@/games/bingo/state";
+import { isLocale, type Locale } from "@/i18n/locales";
+import GameView from "@/components/GameView";
 import AttendeeList from "@/components/AttendeeList";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import Wordmark from "@/components/Wordmark";
@@ -19,7 +24,25 @@ export default async function PlayerSessionPage({
   if (!user) redirect(`/s/${id}`);
 
   const players = await listPlayers(id);
+  const me = await getPlayer(id, user.id);
+  const game = await getActiveGame(id);
+  // For Phase 2 only Bingo exists; widen this when more game types are added.
+  const gameState = game ? ((await getGameState(game)) as BingoState) : null;
+  const scores = game ? await getScores(game) : {};
+
   const t = await getTranslations("player");
+  const localeRaw = await getLocale();
+  const locale: Locale = isLocale(localeRaw) ? localeRaw : "en";
+  const bingoLabels = BingoGame.prompts(locale);
+
+  const initialDashboard = {
+    session: { id: session.id, name: session.name, ends_at: session.ends_at },
+    players,
+    game: game ? { id: game.id, type: game.type, status: game.status } : null,
+    gameState,
+    scores,
+    me: me ? { user_id: user.id, code: me.code, display_name: user.name } : null,
+  };
 
   return (
     <main className="min-h-dvh flex flex-col">
@@ -40,15 +63,41 @@ export default async function PlayerSessionPage({
         >
           {session.name}
         </h1>
-        <p className="font-body text-ink/60 text-sm mb-8">
+        <p className="font-body text-ink/60 text-sm mb-6">
           {t("playingAs")}{" "}
           <span className="font-display font-semibold uppercase text-ink" style={{ letterSpacing: "0.05em" }}>
             {user.name ?? "Guest"}
           </span>
         </p>
 
-        <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50 mb-8">
-          {t("gamesComingSoon")}
+        {me?.code && (
+          <div
+            className="bg-ink text-cream p-4 mb-8 flex items-center justify-between"
+            style={{ boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+          >
+            <span
+              className="font-display font-semibold text-xs uppercase text-cream/70"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {t("yourCode")}
+            </span>
+            <span
+              className="font-display font-bold text-3xl tracking-widest text-yellow"
+              style={{ letterSpacing: "0.15em" }}
+            >
+              {me.code}
+            </span>
+          </div>
+        )}
+
+        <div className="mb-10">
+          <GameView
+            sessionId={session.id}
+            initial={initialDashboard}
+            locale={locale}
+            bingoLabels={bingoLabels}
+            noActiveGameMessage={t("noActiveGame")}
+          />
         </div>
 
         <h2

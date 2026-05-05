@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { getSession, listPlayers } from "@/lib/sessions";
+import { getActiveGame, getGameState, getScores } from "@/lib/games";
 import { getBaseUrl } from "@/lib/url";
 import QRCodeSVG from "@/components/QRCode";
 import AttendeeList from "@/components/AttendeeList";
+import Leaderboard from "@/components/Leaderboard";
 
-// Big-screen / projector view. Public, no auth — venue staff opens this on a
-// browser pointed at the projector. Inverted REALITY palette (ink ground +
-// cream + a chromatic accent) for high contrast and visual punch.
+// Big-screen / projector view. Public, no auth. Inverted REALITY palette
+// (ink ground + cream + a chromatic accent) for high contrast on the projector.
 export default async function BigScreenPage({
   params,
 }: {
@@ -19,6 +20,15 @@ export default async function BigScreenPage({
   const baseUrl = await getBaseUrl();
   const joinUrl = `${baseUrl}/s/${session.id}`;
   const players = await listPlayers(session.id);
+  const game = await getActiveGame(session.id);
+  const gameState = game ? await getGameState(game) : null;
+  const scores = game ? await getScores(game) : {};
+
+  const initialDashboard = {
+    game: game ? { id: game.id, type: game.type, status: game.status } : null,
+    players,
+    scores,
+  };
 
   return (
     <main className="min-h-dvh bg-ink text-cream flex flex-col">
@@ -37,7 +47,7 @@ export default async function BigScreenPage({
         </div>
       </header>
 
-      <section className="flex-1 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-12 px-10 py-10 items-center">
+      <section className="flex-1 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-12 px-10 py-10 items-start">
         <div className="flex flex-col items-center gap-4">
           <QRCodeSVG value={joinUrl} size={420} />
           <p
@@ -51,16 +61,29 @@ export default async function BigScreenPage({
           </p>
         </div>
 
-        <div className="flex flex-col gap-4 min-w-0">
-          <p
-            className="font-display font-semibold text-xs uppercase text-cream/60"
-            style={{ letterSpacing: "0.05em" }}
-          >
-            In the room
-          </p>
-          <AttendeeList sessionId={session.id} initial={players} variant="big-screen" pollMs={2000} />
+        <div className="flex flex-col gap-6 min-w-0">
+          {game && (
+            <Leaderboard sessionId={session.id} initial={initialDashboard} />
+          )}
+          <div>
+            <p
+              className="font-display font-semibold text-xs uppercase text-cream/60 mb-3"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              In the room
+            </p>
+            <AttendeeList
+              sessionId={session.id}
+              initial={players}
+              variant="big-screen"
+              pollMs={2000}
+            />
+          </div>
         </div>
       </section>
+
+      {/* Suppress quiet game state — it's loaded by the leaderboard via polling. */}
+      <span hidden>{gameState ? "1" : "0"}</span>
 
       <footer className="px-10 pb-8 text-center font-body text-xs text-cream/50">
         86 Mai Thúc Lân, Đà Nẵng · realitydn.com

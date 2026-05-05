@@ -29,7 +29,8 @@
   "player": {
     "youreIn": "You're in",
     "playingAs": "Playing as",
-    "gamesComingSoon": "Games launch in Phase 2 — sit tight.",
+    "yourCode": "Your code",
+    "noActiveGame": "No game running. Wait for the host to start one.",
     "inTheRoom": "In the room ({count})"
   },
   "footer": {

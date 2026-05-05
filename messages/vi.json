@@ -29,7 +29,8 @@
   "player": {
     "youreIn": "Bạn đang ở trong",
     "playingAs": "Chơi với tên",
-    "gamesComingSoon": "Trò chơi sẽ ra mắt ở giai đoạn 2 — chờ chút nhé.",
+    "yourCode": "Mã của bạn",
+    "noActiveGame": "Chưa có trò chơi. Chờ chủ phòng bắt đầu nhé.",
     "inTheRoom": "Trong phòng ({count})"
   },
   "footer": {

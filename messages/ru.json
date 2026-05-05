@@ -29,7 +29,8 @@
   "player": {
     "youreIn": "Вы в",
     "playingAs": "Играете как",
-    "gamesComingSoon": "Игры появятся на этапе 2 — подождите немного.",
+    "yourCode": "Ваш код",
+    "noActiveGame": "Нет активной игры. Подождите, пока ведущий начнёт.",
     "inTheRoom": "В зале ({count})"
   },
   "footer": {
