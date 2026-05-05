@@ -1,5 +1,6 @@
 import { getDB } from "./db";
 import { shortId } from "./short-id";
+import { notifySession } from "./realtime";
 
 export type GameSession = {
   id: string;
@@ -48,6 +49,7 @@ export async function endSession(id: string): Promise<void> {
     .prepare("UPDATE game_sessions SET ends_at = ? WHERE id = ? AND ends_at IS NULL")
     .bind(Date.now(), id)
     .run();
+  await notifySession(id, "session_ended");
 }
 
 export async function listActiveSessions(): Promise<GameSession[]> {
@@ -92,6 +94,7 @@ export async function joinSession(sessionId: string, userId: string): Promise<vo
     )
     .bind(sessionId, userId, code, Date.now())
     .run();
+  await notifySession(sessionId, "player_joined");
 }
 
 export async function listPlayers(sessionId: string): Promise<SessionPlayer[]> {

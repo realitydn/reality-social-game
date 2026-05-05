@@ -2,6 +2,7 @@ import { getDB } from "./db";
 import { shortId } from "./short-id";
 import { listEvents, appendEvent } from "./events";
 import { listPlayers } from "./sessions";
+import { notifySession } from "./realtime";
 import { getGameType } from "@/games/registry";
 import type { GameType } from "@/games/types";
 
@@ -76,6 +77,8 @@ export async function startGame(sessionId: string, type: string): Promise<GameRo
     }
   }
 
+  await notifySession(sessionId, "game_started");
+
   return {
     id,
     session_id: sessionId,
@@ -92,6 +95,7 @@ export async function endGame(gameId: string): Promise<void> {
   const game = await getGame(gameId);
   if (!game || game.status !== "running") return;
   await finalizeGame(game);
+  await notifySession(game.session_id, "game_ended");
 }
 
 export async function getActiveGame(sessionId: string): Promise<GameRow | null> {

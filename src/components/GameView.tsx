@@ -10,6 +10,7 @@ import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairState } from "@/games/speed-pair/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { Locale } from "@/i18n/locales";
+import { useRoomNotifications } from "@/lib/use-room-notifications";
 
 type AnyGameState = BingoState | TargetHuntState | SpeedPairState;
 
@@ -40,7 +41,7 @@ export default function GameView({
   bingoLabels,
   targetHuntLabels,
   speedPairLabels,
-  pollMs = 2500,
+  pollMs = 5000,
   noActiveGameMessage,
 }: Props) {
   const [data, setData] = useState<Dashboard>(initial);
@@ -58,6 +59,8 @@ export default function GameView({
     const id = setInterval(refresh, pollMs);
     return () => clearInterval(id);
   }, [refresh, pollMs]);
+
+  useRoomNotifications(sessionId, refresh);
 
   const postEvent = useCallback(
     async (body: unknown): Promise<{ ok: boolean; error?: string }> => {

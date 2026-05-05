@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SessionPlayer } from "@/lib/sessions";
+import { useRoomNotifications } from "@/lib/use-room-notifications";
 
 type Dashboard = {
   game: { id: string; type: string; status: string } | null;
@@ -28,27 +29,24 @@ const SWATCH_BG = [
   "bg-green",
 ];
 
-export default function Leaderboard({ sessionId, initial, pollMs = 2500, topN = 5 }: Props) {
+export default function Leaderboard({ sessionId, initial, pollMs = 5000, topN = 5 }: Props) {
   const [data, setData] = useState<Dashboard>(initial);
 
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/state`, { cache: "no-store" });
+      if (res.ok) setData((await res.json()) as Dashboard);
+    } catch {
+      /* swallow */
+    }
+  }, [sessionId]);
+
   useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const res = await fetch(`/api/sessions/${sessionId}/state`, { cache: "no-store" });
-        if (!res.ok) return;
-        const next = (await res.json()) as Dashboard;
-        if (!cancelled) setData(next);
-      } catch {
-        /* swallow */
-      }
-    };
-    const id = setInterval(tick, pollMs);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [sessionId, pollMs]);
+    const id = setInterval(refresh, pollMs);
+    return () => clearInterval(id);
+  }, [refresh, pollMs]);
+
+  useRoomNotifications(sessionId, refresh);
 
   if (!data.game) return null;
 

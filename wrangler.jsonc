@@ -1,7 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/wrangler.json",
   "name": "reality-social-game",
-  "main": ".open-next/worker.js",
+  // Custom entry that wraps the OpenNext-built worker + exports the SessionRoom DO
+  // and intercepts WebSocket upgrades. `opennextjs-cloudflare build` generates the
+  // file imported by ./worker.ts; deploy with `npm run deploy`.
+  "main": "./worker.ts",
   "compatibility_date": "2025-04-15",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -15,6 +18,20 @@
       // Run `wrangler d1 create socialgame-state` and paste the returned id here.
       "database_id": "REPLACE_AFTER_WRANGLER_D1_CREATE",
       "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION_ROOM",
+        "class_name": "SessionRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SessionRoom"]
     }
   ],
   // R2 binding (uncomment after enabling R2 + creating bucket):

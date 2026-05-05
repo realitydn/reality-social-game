@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getGame, getGameState } from "@/lib/games";
 import { findPlayerByCode } from "@/lib/sessions";
 import { appendEvent } from "@/lib/events";
+import { notifySession } from "@/lib/realtime";
 import { getGameType } from "@/games/registry";
 import { promptIdAt } from "@/games/bingo/card";
 import type { BingoEvent, BingoState } from "@/games/bingo/state";
@@ -88,6 +89,7 @@ export async function POST(
         createdAt: now,
       },
     });
+    await notifySession(game.session_id, "bingo_claim");
     return NextResponse.json({ ok: true, claimId: eventId });
   }
 
@@ -109,6 +111,7 @@ export async function POST(
       targetId: null,
       payload: { claimId: body.claimId, confirmerId: user.id, at: now },
     });
+    await notifySession(game.session_id, body.kind);
     return NextResponse.json({ ok: true });
   }
 
@@ -140,6 +143,7 @@ export async function POST(
         createdAt: now,
       },
     });
+    await notifySession(game.session_id, "target_hunt_tag_claim");
     return NextResponse.json({ ok: true, claimId: eventId });
   }
 
@@ -161,6 +165,7 @@ export async function POST(
       targetId: null,
       payload: { claimId: body.claimId, confirmerId: user.id, at: now },
     });
+    await notifySession(game.session_id, body.kind);
     return NextResponse.json({ ok: true });
   }
 
@@ -196,6 +201,7 @@ export async function POST(
       });
       next = (await getGameState(game)) as SpeedPairState;
     }
+    await notifySession(game.session_id, "speed_pair_done");
     return NextResponse.json({ ok: true });
   }
 

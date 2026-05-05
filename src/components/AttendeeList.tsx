@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SessionPlayer } from "@/lib/sessions";
+import { useRoomNotifications } from "@/lib/use-room-notifications";
 
 type Props = {
   sessionId: string;
@@ -13,29 +14,28 @@ type Props = {
 export default function AttendeeList({
   sessionId,
   initial,
-  pollMs = 3000,
+  pollMs = 5000,
   variant = "default",
 }: Props) {
   const [players, setPlayers] = useState<SessionPlayer[]>(initial);
 
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/players`, { cache: "no-store" });
+      if (!res.ok) return;
+      const next = (await res.json()) as { players: SessionPlayer[] };
+      setPlayers(next.players);
+    } catch {
+      // Network blips are fine — try again next tick.
+    }
+  }, [sessionId]);
+
   useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const res = await fetch(`/api/sessions/${sessionId}/players`, { cache: "no-store" });
-        if (!res.ok) return;
-        const next = (await res.json()) as { players: SessionPlayer[] };
-        if (!cancelled) setPlayers(next.players);
-      } catch {
-        // Network blips are fine — try again next tick.
-      }
-    };
-    const id = setInterval(tick, pollMs);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [sessionId, pollMs]);
+    const id = setInterval(refresh, pollMs);
+    return () => clearInterval(id);
+  }, [refresh, pollMs]);
+
+  useRoomNotifications(sessionId, refresh);
 
   if (variant === "big-screen") {
     return (
