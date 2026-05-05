@@ -31,7 +31,12 @@
     "playingAs": "Playing as",
     "yourCode": "Your code",
     "noActiveGame": "No game running. Wait for the host to start one.",
-    "inTheRoom": "In the room ({count})"
+    "inTheRoom": "In the room ({count})",
+    "sessionEndedHeading": "That's a wrap.",
+    "yourScore": "Your score",
+    "yourRank": "Your rank",
+    "seeLeaderboard": "See the leaderboard",
+    "untilNextTime": "Catch the next one."
   },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"

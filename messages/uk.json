@@ -31,7 +31,12 @@
     "playingAs": "Граєте як",
     "yourCode": "Ваш код",
     "noActiveGame": "Активної гри немає. Зачекайте, поки ведучий почне.",
-    "inTheRoom": "У залі ({count})"
+    "inTheRoom": "У залі ({count})",
+    "sessionEndedHeading": "Сесію завершено.",
+    "yourScore": "Ваш рахунок",
+    "yourRank": "Ваше місце",
+    "seeLeaderboard": "Переглянути таблицю лідерів",
+    "untilNextTime": "До наступного разу."
   },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession, listPlayers, getPlayer } from "@/lib/sessions";
@@ -29,15 +30,96 @@ export default async function PlayerSessionPage({
 
   const players = await listPlayers(id);
   const me = await getPlayer(id, user.id);
+
+  const t = await getTranslations("player");
+  const localeRaw = await getLocale();
+  const locale: Locale = isLocale(localeRaw) ? localeRaw : "en";
+
+  // Session ended → render a recap card instead of the live game UI.
+  if (session.ends_at) {
+    const myScore = me?.score ?? 0;
+    const myRank =
+      [...players].sort((a, b) => b.score - a.score).findIndex((p) => p.user_id === user.id) + 1;
+    return (
+      <main className="min-h-dvh flex flex-col">
+        <header className="flex items-center justify-between p-6">
+          <Wordmark />
+          <LocaleSwitcher />
+        </header>
+        <section className="flex-1 px-6 max-w-md w-full mx-auto pb-10 flex flex-col gap-6">
+          <div>
+            <p
+              className="font-display font-semibold text-xs uppercase text-ink/60 mb-2"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {t("sessionEndedHeading")}
+            </p>
+            <h1
+              className="font-display font-bold text-3xl uppercase mb-1"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {session.name}
+            </h1>
+          </div>
+
+          <div
+            className="bg-yellow text-ink p-6 flex items-center justify-between"
+            style={{ boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+          >
+            <div>
+              <p
+                className="font-display font-semibold text-xs uppercase text-ink/60 mb-1"
+                style={{ letterSpacing: "0.05em" }}
+              >
+                {t("yourScore")}
+              </p>
+              <p
+                className="font-display font-bold text-5xl"
+                style={{ letterSpacing: "0.05em" }}
+              >
+                {myScore}
+              </p>
+            </div>
+            {myRank > 0 && (
+              <div className="text-right">
+                <p
+                  className="font-display font-semibold text-xs uppercase text-ink/60 mb-1"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  {t("yourRank")}
+                </p>
+                <p
+                  className="font-display font-bold text-5xl"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  #{myRank}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <Link
+            href="/leaderboard"
+            className="block text-center bg-ink text-cream font-display font-bold uppercase px-6 py-3 transition hover:translate-y-0.5"
+            style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+          >
+            {t("seeLeaderboard")}
+          </Link>
+
+          <p className="font-body text-center text-ink/50 text-sm pt-4">
+            {t("untilNextTime")}
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   const game = await getActiveGame(id);
   const gameState = game
     ? ((await getGameState(game)) as BingoState | TargetHuntState | SpeedPairState)
     : null;
   const scores = game ? await getScores(game) : {};
 
-  const t = await getTranslations("player");
-  const localeRaw = await getLocale();
-  const locale: Locale = isLocale(localeRaw) ? localeRaw : "en";
   const bingoLabels = BingoGame.prompts(locale);
   const targetHuntLabels = TargetHuntGame.prompts(locale);
   const speedPairLabels = SpeedPairGame.prompts(locale);
@@ -72,7 +154,10 @@ export default async function PlayerSessionPage({
         </h1>
         <p className="font-body text-ink/60 text-sm mb-6">
           {t("playingAs")}{" "}
-          <span className="font-display font-semibold uppercase text-ink" style={{ letterSpacing: "0.05em" }}>
+          <span
+            className="font-display font-semibold uppercase text-ink"
+            style={{ letterSpacing: "0.05em" }}
+          >
             {user.name ?? "Guest"}
           </span>
         </p>

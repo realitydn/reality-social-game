@@ -31,7 +31,12 @@
     "playingAs": "Chơi với tên",
     "yourCode": "Mã của bạn",
     "noActiveGame": "Chưa có trò chơi. Chờ chủ phòng bắt đầu nhé.",
-    "inTheRoom": "Trong phòng ({count})"
+    "inTheRoom": "Trong phòng ({count})",
+    "sessionEndedHeading": "Hết tối.",
+    "yourScore": "Điểm của bạn",
+    "yourRank": "Hạng của bạn",
+    "seeLeaderboard": "Xem bảng xếp hạng",
+    "untilNextTime": "Hẹn gặp lại lần sau."
   },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"

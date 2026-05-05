@@ -5,6 +5,7 @@ import { getBaseUrl } from "@/lib/url";
 import QRCodeSVG from "@/components/QRCode";
 import AttendeeList from "@/components/AttendeeList";
 import Leaderboard from "@/components/Leaderboard";
+import SessionRecap from "@/components/SessionRecap";
 
 // Big-screen / projector view. Public, no auth. Inverted REALITY palette
 // (ink ground + cream + a chromatic accent) for high contrast on the projector.
@@ -17,9 +18,30 @@ export default async function BigScreenPage({
   const session = await getSession(id);
   if (!session) notFound();
 
+  const players = await listPlayers(session.id);
+
+  // Session ended → recap splash, no QR, no polling.
+  if (session.ends_at) {
+    return (
+      <main className="min-h-dvh bg-ink text-cream flex flex-col">
+        <header className="flex items-center justify-between px-10 pt-10">
+          <div
+            className="font-mark font-semibold text-3xl uppercase"
+            style={{ letterSpacing: "0.1em" }}
+          >
+            REALITY
+          </div>
+        </header>
+        <SessionRecap sessionName={session.name} players={players} />
+        <footer className="px-10 pb-8 text-center font-body text-xs text-cream/50">
+          86 Mai Thúc Lân, Đà Nẵng · realitydn.com
+        </footer>
+      </main>
+    );
+  }
+
   const baseUrl = await getBaseUrl();
   const joinUrl = `${baseUrl}/s/${session.id}`;
-  const players = await listPlayers(session.id);
   const game = await getActiveGame(session.id);
   const gameState = game ? await getGameState(game) : null;
   const scores = game ? await getScores(game) : {};
@@ -62,9 +84,7 @@ export default async function BigScreenPage({
         </div>
 
         <div className="flex flex-col gap-6 min-w-0">
-          {game && (
-            <Leaderboard sessionId={session.id} initial={initialDashboard} />
-          )}
+          {game && <Leaderboard sessionId={session.id} initial={initialDashboard} />}
           <div>
             <p
               className="font-display font-semibold text-xs uppercase text-cream/60 mb-3"
@@ -82,7 +102,6 @@ export default async function BigScreenPage({
         </div>
       </section>
 
-      {/* Suppress quiet game state — it's loaded by the leaderboard via polling. */}
       <span hidden>{gameState ? "1" : "0"}</span>
 
       <footer className="px-10 pb-8 text-center font-body text-xs text-cream/50">
