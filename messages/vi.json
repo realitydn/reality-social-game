@@ -35,5 +35,13 @@
   },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"
+  },
+  "leaderboard": {
+    "heading": "Bảng xếp hạng",
+    "subtitle": "Điểm qua các phiên trò chơi tại REALITY.",
+    "tonight": "Tối nay",
+    "week": "Tuần này",
+    "allTime": "Tất cả thời gian",
+    "empty": "Chưa có điểm. Hãy đến chơi nhé."
   }
 }

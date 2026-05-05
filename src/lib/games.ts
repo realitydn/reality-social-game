@@ -1,6 +1,7 @@
 import { getDB } from "./db";
 import { shortId } from "./short-id";
-import { listEvents } from "./events";
+import { listEvents, appendEvent } from "./events";
+import { listPlayers } from "./sessions";
 import { getGameType } from "@/games/registry";
 import type { GameType } from "@/games/types";
 
@@ -15,14 +16,37 @@ export type GameRow = {
   created_at: number;
 };
 
-export async function startGame(sessionId: string, type: string): Promise<GameRow> {
-  if (!getGameType(type)) throw new Error(`Unknown game type: ${type}`);
+// Compute the game's final per-player scores and add them to session_players.score.
+// Called when a game is explicitly ended OR when a new game starts in the same session
+// (the previous running game gets finalized first).
+async function finalizeGame(game: GameRow): Promise<void> {
   const db = await getDB();
-  // Only one running game per session at a time. End any existing running game.
+  const scores = await getScores(game);
+  const entries = Object.entries(scores);
+  for (const [userId, points] of entries) {
+    if (!points) continue;
+    await db
+      .prepare(
+        "UPDATE session_players SET score = score + ? WHERE session_id = ? AND user_id = ?",
+      )
+      .bind(points, game.session_id, userId)
+      .run();
+  }
   await db
-    .prepare("UPDATE games SET status = 'ended', ended_at = ? WHERE session_id = ? AND status = 'running'")
-    .bind(Date.now(), sessionId)
+    .prepare("UPDATE games SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'running'")
+    .bind(Date.now(), game.id)
     .run();
+}
+
+export async function startGame(sessionId: string, type: string): Promise<GameRow> {
+  const gt = getGameType(type);
+  if (!gt) throw new Error(`Unknown game type: ${type}`);
+  const db = await getDB();
+
+  // Finalize any currently-running game in this session (persists its scores).
+  const prior = await getActiveGame(sessionId);
+  if (prior) await finalizeGame(prior);
+
   const id = shortId(8);
   const now = Date.now();
   await db
@@ -32,6 +56,26 @@ export async function startGame(sessionId: string, type: string): Promise<GameRo
     )
     .bind(id, sessionId, type, now, now)
     .run();
+
+  // Optional onStart hook: seed events that depend on the current roster.
+  if (gt.onStart) {
+    const players = await listPlayers(sessionId);
+    const seedEvents = gt.onStart(
+      { gameId: id, sessionId },
+      players.map((p) => p.user_id),
+    );
+    for (const e of seedEvents) {
+      await appendEvent({
+        id: crypto.randomUUID(),
+        gameId: id,
+        kind: e.kind,
+        actorId: null,
+        targetId: null,
+        payload: e.payload,
+      });
+    }
+  }
+
   return {
     id,
     session_id: sessionId,
@@ -45,11 +89,9 @@ export async function startGame(sessionId: string, type: string): Promise<GameRo
 }
 
 export async function endGame(gameId: string): Promise<void> {
-  const db = await getDB();
-  await db
-    .prepare("UPDATE games SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'running'")
-    .bind(Date.now(), gameId)
-    .run();
+  const game = await getGame(gameId);
+  if (!game || game.status !== "running") return;
+  await finalizeGame(game);
 }
 
 export async function getActiveGame(sessionId: string): Promise<GameRow | null> {
@@ -74,7 +116,6 @@ export async function getGame(gameId: string): Promise<GameRow | null> {
     .first<GameRow>();
 }
 
-// Replays all events through the registered game type's reducer to produce current state.
 export async function getGameState<S>(game: GameRow): Promise<S> {
   const gt = getGameType(game.type) as GameType<S, unknown> | null;
   if (!gt) throw new Error(`Unknown game type: ${game.type}`);

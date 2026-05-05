@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import BingoCard from "./BingoCard";
 import BingoPendingClaims from "./BingoPendingClaims";
+import TargetHuntView from "./TargetHuntView";
 import type { BingoState } from "@/games/bingo/state";
+import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { Locale } from "@/i18n/locales";
 
@@ -11,7 +13,7 @@ type Dashboard = {
   session: { id: string; name: string; ends_at: number | null };
   players: SessionPlayer[];
   game: { id: string; type: string; status: string } | null;
-  gameState: BingoState | null;
+  gameState: BingoState | TargetHuntState | null;
   scores: Record<string, number>;
   me: { user_id: string; code: string | null; display_name: string | null } | null;
 };
@@ -21,6 +23,7 @@ type Props = {
   initial: Dashboard;
   locale: Locale;
   bingoLabels: Record<string, string>;
+  targetHuntLabels: Record<string, string>;
   pollMs?: number;
   noActiveGameMessage: string;
 };
@@ -30,6 +33,7 @@ export default function GameView({
   initial,
   locale,
   bingoLabels,
+  targetHuntLabels,
   pollMs = 2500,
   noActiveGameMessage,
 }: Props) {
@@ -49,42 +53,50 @@ export default function GameView({
     return () => clearInterval(id);
   }, [refresh, pollMs]);
 
-  const handleClaim = useCallback(
-    async (
-      squareIdx: number,
-      promptId: string,
-      targetCode: string,
-    ): Promise<{ ok: boolean; error?: string }> => {
-      if (!data.game || !data.me) return { ok: false, error: "no game" };
+  const postEvent = useCallback(
+    async (body: unknown): Promise<{ ok: boolean; error?: string }> => {
+      if (!data.game) return { ok: false, error: "no game" };
       const res = await fetch(`/api/games/${data.game.id}/events`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "bingo_claim", squareIdx, promptId, targetCode }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        return { ok: false, error: body.error ?? "Failed" };
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        return { ok: false, error: j.error ?? "Failed" };
       }
       await refresh();
       return { ok: true };
     },
-    [data.game, data.me, refresh],
+    [data.game, refresh],
   );
 
-  const handleResolve = useCallback(
+  const handleBingoClaim = useCallback(
+    (squareIdx: number, promptId: string, targetCode: string) =>
+      postEvent({ kind: "bingo_claim", squareIdx, promptId, targetCode }),
+    [postEvent],
+  );
+
+  const handleBingoResolve = useCallback(
     async (claimId: string, action: "confirm" | "deny") => {
-      if (!data.game) return;
-      await fetch(`/api/games/${data.game.id}/events`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          kind: action === "confirm" ? "bingo_confirm" : "bingo_deny",
-          claimId,
-        }),
+      await postEvent({
+        kind: action === "confirm" ? "bingo_confirm" : "bingo_deny",
+        claimId,
       });
-      await refresh();
     },
-    [data.game, refresh],
+    [postEvent],
+  );
+
+  const handleTag = useCallback(() => postEvent({ kind: "target_hunt_tag_claim" }), [postEvent]);
+
+  const handleTagResolve = useCallback(
+    async (claimId: string, action: "confirm" | "deny") => {
+      await postEvent({
+        kind: action === "confirm" ? "target_hunt_tag_confirm" : "target_hunt_tag_deny",
+        claimId,
+      });
+    },
+    [postEvent],
   );
 
   if (!data.game || !data.gameState || !data.me) {
@@ -96,10 +108,9 @@ export default function GameView({
   }
 
   if (data.game.type === "bingo") {
-    const myFilled = data.gameState.filled[data.me.user_id] ?? [];
-    const myPending = Object.values(data.gameState.pending).filter(
-      (c) => c.targetId === data.me!.user_id,
-    );
+    const state = data.gameState as BingoState;
+    const myFilled = state.filled[data.me.user_id] ?? [];
+    const myPending = Object.values(state.pending).filter((c) => c.targetId === data.me!.user_id);
     return (
       <div className="flex flex-col gap-6">
         <BingoPendingClaims
@@ -107,7 +118,7 @@ export default function GameView({
           players={data.players}
           locale={locale}
           labels={bingoLabels}
-          onResolve={handleResolve}
+          onResolve={handleBingoResolve}
         />
         <BingoCard
           sessionId={data.session.id}
@@ -116,9 +127,23 @@ export default function GameView({
           locale={locale}
           filled={myFilled}
           labels={bingoLabels}
-          onClaim={handleClaim}
+          onClaim={handleBingoClaim}
         />
       </div>
+    );
+  }
+
+  if (data.game.type === "target-hunt") {
+    const state = data.gameState as TargetHuntState;
+    return (
+      <TargetHuntView
+        state={state}
+        meId={data.me.user_id}
+        players={data.players}
+        labels={targetHuntLabels}
+        onTag={handleTag}
+        onResolve={handleTagResolve}
+      />
     );
   }
 

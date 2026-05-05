@@ -4,7 +4,9 @@ import { getSession, listPlayers, getPlayer } from "@/lib/sessions";
 import { getActiveGame, getGameState, getScores } from "@/lib/games";
 import { getCurrentUser } from "@/lib/session";
 import { BingoGame } from "@/games/bingo";
+import { TargetHuntGame } from "@/games/target-hunt";
 import type { BingoState } from "@/games/bingo/state";
+import type { TargetHuntState } from "@/games/target-hunt/state";
 import { isLocale, type Locale } from "@/i18n/locales";
 import GameView from "@/components/GameView";
 import AttendeeList from "@/components/AttendeeList";
@@ -26,14 +28,14 @@ export default async function PlayerSessionPage({
   const players = await listPlayers(id);
   const me = await getPlayer(id, user.id);
   const game = await getActiveGame(id);
-  // For Phase 2 only Bingo exists; widen this when more game types are added.
-  const gameState = game ? ((await getGameState(game)) as BingoState) : null;
+  const gameState = game ? ((await getGameState(game)) as BingoState | TargetHuntState) : null;
   const scores = game ? await getScores(game) : {};
 
   const t = await getTranslations("player");
   const localeRaw = await getLocale();
   const locale: Locale = isLocale(localeRaw) ? localeRaw : "en";
   const bingoLabels = BingoGame.prompts(locale);
+  const targetHuntLabels = TargetHuntGame.prompts(locale);
 
   const initialDashboard = {
     session: { id: session.id, name: session.name, ends_at: session.ends_at },
@@ -96,6 +98,7 @@ export default async function PlayerSessionPage({
             initial={initialDashboard}
             locale={locale}
             bingoLabels={bingoLabels}
+            targetHuntLabels={targetHuntLabels}
             noActiveGameMessage={t("noActiveGame")}
           />
         </div>

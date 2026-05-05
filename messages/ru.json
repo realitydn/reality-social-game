@@ -35,5 +35,13 @@
   },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"
+  },
+  "leaderboard": {
+    "heading": "Таблица лидеров",
+    "subtitle": "Очки за все игровые сессии в REALITY.",
+    "tonight": "Сегодня",
+    "week": "Эта неделя",
+    "allTime": "За всё время",
+    "empty": "Пока нет очков. Заходите играть."
   }
 }

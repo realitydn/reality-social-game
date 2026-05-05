@@ -35,5 +35,13 @@
   },
   "footer": {
     "address": "86 Mai Thúc Lân, Đà Nẵng"
+  },
+  "leaderboard": {
+    "heading": "Leaderboard",
+    "subtitle": "Points across REALITY game sessions.",
+    "tonight": "Tonight",
+    "week": "This week",
+    "allTime": "All-time",
+    "empty": "No scores yet. Come play."
   }
 }

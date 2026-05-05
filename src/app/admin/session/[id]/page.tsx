@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { endSession, getSession, listPlayers } from "@/lib/sessions";
 import { endGame, getActiveGame, startGame } from "@/lib/games";
+import { PLAYABLE_GAME_TYPES } from "@/games/registry";
 import { getBaseUrl } from "@/lib/url";
 import AttendeeList from "@/components/AttendeeList";
 import Wordmark from "@/components/Wordmark";
@@ -26,9 +27,11 @@ export default async function AdminSessionPage({
     redirect("/admin");
   }
 
-  async function startBingo() {
+  async function startGameAction(formData: FormData) {
     "use server";
-    await startGame(id, "bingo");
+    const type = String(formData.get("type") ?? "");
+    if (!type) return;
+    await startGame(id, type);
     redirect(`/admin/session/${id}`);
   }
 
@@ -92,40 +95,48 @@ export default async function AdminSessionPage({
         </div>
 
         {/* Game controls */}
-        <div className="border-2 border-ink p-4 mb-10 flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <p
-              className="font-display font-semibold text-xs uppercase text-ink/60 mb-1"
-              style={{ letterSpacing: "0.05em" }}
-            >
-              Game
-            </p>
-            <p className="font-display font-bold text-lg uppercase" style={{ letterSpacing: "0.05em" }}>
-              {game ? `${game.type} · running` : "No active game"}
-            </p>
+        <div className="border-2 border-ink p-4 mb-10">
+          <p
+            className="font-display font-semibold text-xs uppercase text-ink/60 mb-3"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            Game
+          </p>
+          <p
+            className="font-display font-bold text-lg uppercase mb-4"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            {game ? `${game.type} · running` : "No active game"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {!session.ends_at &&
+              PLAYABLE_GAME_TYPES.map((g) => (
+                <form key={g.key} action={startGameAction}>
+                  <input type="hidden" name="type" value={g.key} />
+                  <button
+                    type="submit"
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                    style={{
+                      letterSpacing: "0.05em",
+                      boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
+                    }}
+                  >
+                    {game ? `Switch to ${g.label}` : `Start ${g.label}`}
+                  </button>
+                </form>
+              ))}
+            {game && (
+              <form action={endActiveGame}>
+                <button
+                  type="submit"
+                  className="border-2 border-red text-red font-display font-bold uppercase px-4 py-2 transition hover:bg-red hover:text-cream"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  End game
+                </button>
+              </form>
+            )}
           </div>
-          {!game && !session.ends_at && (
-            <form action={startBingo}>
-              <button
-                type="submit"
-                className="bg-yellow text-ink font-display font-bold uppercase px-5 py-2 border-2 border-ink transition hover:translate-y-0.5"
-                style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
-              >
-                Start Bingo
-              </button>
-            </form>
-          )}
-          {game && (
-            <form action={endActiveGame}>
-              <button
-                type="submit"
-                className="border-2 border-red text-red font-display font-bold uppercase px-5 py-2 transition hover:bg-red hover:text-cream"
-                style={{ letterSpacing: "0.05em" }}
-              >
-                End game
-              </button>
-            </form>
-          )}
         </div>
 
         <h2

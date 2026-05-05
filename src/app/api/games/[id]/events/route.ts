@@ -6,10 +6,21 @@ import { appendEvent } from "@/lib/events";
 import { getGameType } from "@/games/registry";
 import { promptIdAt } from "@/games/bingo/card";
 import type { BingoEvent, BingoState } from "@/games/bingo/state";
+import type { TargetHuntEvent, TargetHuntState } from "@/games/target-hunt/state";
 
-type ClaimBody = { kind: "bingo_claim"; squareIdx: number; promptId: string; targetCode: string };
-type ResolveBody = { kind: "bingo_confirm" | "bingo_deny"; claimId: string };
-type EventBody = ClaimBody | ResolveBody;
+type BingoClaimBody = {
+  kind: "bingo_claim";
+  squareIdx: number;
+  promptId: string;
+  targetCode: string;
+};
+type BingoResolveBody = { kind: "bingo_confirm" | "bingo_deny"; claimId: string };
+type TagClaimBody = { kind: "target_hunt_tag_claim" };
+type TagResolveBody = {
+  kind: "target_hunt_tag_confirm" | "target_hunt_tag_deny";
+  claimId: string;
+};
+type EventBody = BingoClaimBody | BingoResolveBody | TagClaimBody | TagResolveBody;
 
 export async function POST(
   req: NextRequest,
@@ -32,10 +43,11 @@ export async function POST(
   if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
 
   const ctx = { gameId: game.id, sessionId: game.session_id };
-  const state = (await getGameState(game)) as BingoState;
   const now = Date.now();
 
+  // ───────────── Bingo ─────────────
   if (body.kind === "bingo_claim") {
+    const state = (await getGameState(game)) as BingoState;
     const target = await findPlayerByCode(game.session_id, body.targetCode);
     if (!target)
       return NextResponse.json({ error: "no player with that code" }, { status: 400 });
@@ -55,7 +67,6 @@ export async function POST(
     };
     const v = gt.validate(state, event, user.id, ctx);
     if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
-
     await appendEvent({
       id: eventId,
       gameId: game.id,
@@ -75,6 +86,7 @@ export async function POST(
   }
 
   if (body.kind === "bingo_confirm" || body.kind === "bingo_deny") {
+    const state = (await getGameState(game)) as BingoState;
     const event: BingoEvent = {
       kind: body.kind,
       claimId: body.claimId,
@@ -83,7 +95,58 @@ export async function POST(
     };
     const v = gt.validate(state, event, user.id, ctx);
     if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: body.kind,
+      actorId: user.id,
+      targetId: null,
+      payload: { claimId: body.claimId, confirmerId: user.id, at: now },
+    });
+    return NextResponse.json({ ok: true });
+  }
 
+  // ───────────── Target Hunt ─────────────
+  if (body.kind === "target_hunt_tag_claim") {
+    const state = (await getGameState(game)) as TargetHuntState;
+    const myTarget = state.targets[user.id];
+    if (!myTarget) return NextResponse.json({ error: "no current target" }, { status: 400 });
+    const eventId = crypto.randomUUID();
+    const event: TargetHuntEvent = {
+      kind: "target_hunt_tag_claim",
+      id: eventId,
+      taggerId: user.id,
+      taggedId: myTarget,
+      createdAt: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: eventId,
+      gameId: game.id,
+      kind: "target_hunt_tag_claim",
+      actorId: user.id,
+      targetId: myTarget,
+      payload: {
+        id: eventId,
+        taggerId: user.id,
+        taggedId: myTarget,
+        createdAt: now,
+      },
+    });
+    return NextResponse.json({ ok: true, claimId: eventId });
+  }
+
+  if (body.kind === "target_hunt_tag_confirm" || body.kind === "target_hunt_tag_deny") {
+    const state = (await getGameState(game)) as TargetHuntState;
+    const event: TargetHuntEvent = {
+      kind: body.kind,
+      claimId: body.claimId,
+      confirmerId: user.id,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
     await appendEvent({
       id: crypto.randomUUID(),
       gameId: game.id,
