@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDB } from "./db";
 
-export type PhotoPurpose = "avatar" | "photo-bingo" | "disposable";
+export type PhotoPurpose = "avatar" | "photo-bingo" | "disposable" | "quiz-question";
 
 export type Photo = {
   id: string;
@@ -21,6 +21,7 @@ const ALLOWED_PURPOSES: ReadonlySet<PhotoPurpose> = new Set([
   "avatar",
   "photo-bingo",
   "disposable",
+  "quiz-question",
 ]);
 const MAX_BYTES = 1_500_000; // 1.5 MB after client-side resize is plenty for avatars
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);

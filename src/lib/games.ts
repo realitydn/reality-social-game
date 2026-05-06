@@ -39,7 +39,22 @@ async function finalizeGame(game: GameRow): Promise<void> {
     .run();
 }
 
-export async function startGame(sessionId: string, type: string): Promise<GameRow> {
+export type StartGameOptions = {
+  /** Persisted on the games row as games.config (JSON). Use for things like
+   *  pointing a quiz-round at a package id. */
+  config?: unknown;
+  /** Passed opaquely to the GameType's onStart() as its third argument. The
+   *  orchestration layer (e.g. an admin server action) uses this to hand
+   *  pre-resolved data — like a package's questions snapshot — into the
+   *  seed event without the GameType needing DB access. */
+  seedData?: unknown;
+};
+
+export async function startGame(
+  sessionId: string,
+  type: string,
+  options: StartGameOptions = {},
+): Promise<GameRow> {
   const gt = getGameType(type);
   if (!gt) throw new Error(`Unknown game type: ${type}`);
   const db = await getDB();
@@ -50,20 +65,23 @@ export async function startGame(sessionId: string, type: string): Promise<GameRo
 
   const id = shortId(8);
   const now = Date.now();
+  const configJson = options.config !== undefined ? JSON.stringify(options.config) : "{}";
   await db
     .prepare(
       `INSERT INTO games (id, session_id, type, config, status, started_at, ended_at, created_at)
-       VALUES (?, ?, ?, '{}', 'running', ?, NULL, ?)`,
+       VALUES (?, ?, ?, ?, 'running', ?, NULL, ?)`,
     )
-    .bind(id, sessionId, type, now, now)
+    .bind(id, sessionId, type, configJson, now, now)
     .run();
 
-  // Optional onStart hook: seed events that depend on the current roster.
+  // Optional onStart hook: seed events that depend on the current roster
+  // and/or upstream data passed in via seedData.
   if (gt.onStart) {
     const players = await listPlayers(sessionId);
     const seedEvents = gt.onStart(
       { gameId: id, sessionId },
       players.map((p) => p.user_id),
+      options.seedData,
     );
     for (const e of seedEvents) {
       await appendEvent({
@@ -83,7 +101,7 @@ export async function startGame(sessionId: string, type: string): Promise<GameRo
     id,
     session_id: sessionId,
     type,
-    config: "{}",
+    config: configJson,
     status: "running",
     started_at: now,
     ended_at: null,

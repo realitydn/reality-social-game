@@ -5,14 +5,16 @@ import BingoCard from "./BingoCard";
 import BingoPendingClaims from "./BingoPendingClaims";
 import TargetHuntView from "./TargetHuntView";
 import SpeedPairView from "./SpeedPairView";
+import QuizRoundView from "./QuizRoundView";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairState } from "@/games/speed-pair/state";
+import type { QuizRoundState } from "@/games/quiz-round/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { Locale } from "@/i18n/locales";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
 
-type AnyGameState = BingoState | TargetHuntState | SpeedPairState;
+type AnyGameState = BingoState | TargetHuntState | SpeedPairState | QuizRoundState;
 
 type Dashboard = {
   session: { id: string; name: string; ends_at: number | null };
@@ -30,6 +32,7 @@ type Props = {
   bingoLabels: Record<string, string>;
   targetHuntLabels: Record<string, string>;
   speedPairLabels: Record<string, string>;
+  quizRoundLabels: Record<string, string>;
   pollMs?: number;
   noActiveGameMessage: string;
 };
@@ -41,6 +44,7 @@ export default function GameView({
   bingoLabels,
   targetHuntLabels,
   speedPairLabels,
+  quizRoundLabels,
   pollMs = 5000,
   noActiveGameMessage,
 }: Props) {
@@ -113,6 +117,11 @@ export default function GameView({
     [postEvent],
   );
 
+  const handleQuizAnswer = useCallback(
+    (value: unknown) => postEvent({ kind: "quiz_round_answer", value }),
+    [postEvent],
+  );
+
   if (!data.game || !data.gameState || !data.me) {
     return (
       <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
@@ -170,6 +179,18 @@ export default function GameView({
         players={data.players}
         labels={speedPairLabels}
         onDone={handleSpeedPairDone}
+      />
+    );
+  }
+
+  if (data.game.type === "quiz-round") {
+    const state = data.gameState as QuizRoundState;
+    return (
+      <QuizRoundView
+        state={state}
+        meId={data.me.user_id}
+        labels={quizRoundLabels}
+        onAnswer={handleQuizAnswer}
       />
     );
   }

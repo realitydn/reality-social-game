@@ -9,6 +9,7 @@ import { promptIdAt } from "@/games/bingo/card";
 import type { BingoEvent, BingoState } from "@/games/bingo/state";
 import type { TargetHuntEvent, TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairEvent, SpeedPairState } from "@/games/speed-pair/state";
+import type { QuizRoundEvent, QuizRoundState } from "@/games/quiz-round/state";
 
 type BingoClaimBody = {
   kind: "bingo_claim";
@@ -23,12 +24,22 @@ type TagResolveBody = {
   claimId: string;
 };
 type SpeedPairDoneBody = { kind: "speed_pair_done" };
+type QuizOpenBody = { kind: "quiz_round_open_question"; questionIdx: number };
+type QuizAnswerBody = { kind: "quiz_round_answer"; value: unknown };
+type QuizCloseBody = { kind: "quiz_round_close_question" };
+type QuizAdvanceBody = { kind: "quiz_round_advance"; nextIdx: number };
+type QuizEndBody = { kind: "quiz_round_end" };
 type EventBody =
   | BingoClaimBody
   | BingoResolveBody
   | TagClaimBody
   | TagResolveBody
-  | SpeedPairDoneBody;
+  | SpeedPairDoneBody
+  | QuizOpenBody
+  | QuizAnswerBody
+  | QuizCloseBody
+  | QuizAdvanceBody
+  | QuizEndBody;
 
 export async function POST(
   req: NextRequest,
@@ -202,6 +213,123 @@ export async function POST(
       next = (await getGameState(game)) as SpeedPairState;
     }
     await notifySession(game.session_id, "speed_pair_done");
+    return NextResponse.json({ ok: true });
+  }
+
+  // ───────────── Quiz Round ─────────────
+  if (body.kind === "quiz_round_open_question") {
+    const state = (await getGameState(game)) as QuizRoundState;
+    const event: QuizRoundEvent = {
+      kind: "quiz_round_open_question",
+      questionIdx: body.questionIdx,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_round_open_question",
+      actorId: user.id,
+      targetId: null,
+      payload: { questionIdx: body.questionIdx, at: now },
+    });
+    await notifySession(game.session_id, "quiz_round_open_question");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "quiz_round_close_question") {
+    const state = (await getGameState(game)) as QuizRoundState;
+    if (state.currentIdx === null)
+      return NextResponse.json({ error: "no question open" }, { status: 400 });
+    const event: QuizRoundEvent = {
+      kind: "quiz_round_close_question",
+      questionIdx: state.currentIdx,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_round_close_question",
+      actorId: user.id,
+      targetId: null,
+      payload: { questionIdx: state.currentIdx, at: now },
+    });
+    await notifySession(game.session_id, "quiz_round_close_question");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "quiz_round_advance") {
+    const state = (await getGameState(game)) as QuizRoundState;
+    const event: QuizRoundEvent = {
+      kind: "quiz_round_advance",
+      nextIdx: body.nextIdx,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_round_advance",
+      actorId: user.id,
+      targetId: null,
+      payload: { nextIdx: body.nextIdx, at: now },
+    });
+    await notifySession(game.session_id, "quiz_round_advance");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "quiz_round_end") {
+    const state = (await getGameState(game)) as QuizRoundState;
+    const event: QuizRoundEvent = { kind: "quiz_round_end", at: now };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_round_end",
+      actorId: user.id,
+      targetId: null,
+      payload: { at: now },
+    });
+    await notifySession(game.session_id, "quiz_round_end");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "quiz_round_answer") {
+    const state = (await getGameState(game)) as QuizRoundState;
+    if (state.phase !== "question" || state.currentIdx === null || state.questionOpenedAt === null)
+      return NextResponse.json({ error: "no question open" }, { status: 400 });
+    // Server computes elapsedMs from state — clients can't fudge their speed.
+    const elapsedMs = Math.max(0, now - state.questionOpenedAt);
+    const event: QuizRoundEvent = {
+      kind: "quiz_round_answer",
+      playerId: user.id,
+      questionIdx: state.currentIdx,
+      value: body.value,
+      elapsedMs,
+      submittedAt: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_round_answer",
+      actorId: user.id,
+      targetId: null,
+      payload: {
+        playerId: user.id,
+        questionIdx: state.currentIdx,
+        value: body.value,
+        elapsedMs,
+        submittedAt: now,
+      },
+    });
+    await notifySession(game.session_id, "quiz_round_answer");
     return NextResponse.json({ ok: true });
   }
 

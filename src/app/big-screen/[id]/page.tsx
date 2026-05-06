@@ -6,6 +6,8 @@ import QRCodeSVG from "@/components/QRCode";
 import AttendeeList from "@/components/AttendeeList";
 import Leaderboard from "@/components/Leaderboard";
 import SessionRecap from "@/components/SessionRecap";
+import QuizRoundBigScreen from "@/components/QuizRoundBigScreen";
+import type { QuizRoundState } from "@/games/quiz-round/state";
 
 // Big-screen / projector view. Public, no auth. Inverted REALITY palette
 // (ink ground + cream + a chromatic accent) for high contrast on the projector.
@@ -51,6 +53,50 @@ export default async function BigScreenPage({
     players,
     scores,
   };
+
+  // Quiz Round takes over the whole stage — question display + reveal +
+  // inter-question leaderboard. Other game types keep the existing QR-plus-
+  // sidebar layout.
+  if (game?.type === "quiz-round") {
+    return (
+      <main className="min-h-dvh bg-ink text-cream flex flex-col">
+        <header className="flex items-center justify-between px-10 pt-8">
+          <div
+            className="font-mark font-semibold text-2xl uppercase"
+            style={{ letterSpacing: "0.1em" }}
+          >
+            REALITY
+          </div>
+          <div
+            className="font-display font-bold text-xl uppercase text-yellow"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            {session.name}
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <QRCodeSVG value={joinUrl} size={120} />
+            <p
+              className="font-display font-bold text-[10px] uppercase text-cream/70"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              Scan to join
+            </p>
+          </div>
+        </header>
+        <QuizRoundBigScreen
+          sessionId={session.id}
+          initial={{
+            gameState: gameState as QuizRoundState | null,
+            players,
+            scores,
+          }}
+        />
+        <footer className="px-10 pb-6 text-center font-body text-xs text-cream/50">
+          86 Mai Thúc Lân, Đà Nẵng · realitydn.com
+        </footer>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-dvh bg-ink text-cream flex flex-col">

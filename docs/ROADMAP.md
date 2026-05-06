@@ -14,6 +14,7 @@ Where this app might go, organized by how much it costs to get there. Shipped ph
 | 5 | Session-end recap on big screen + player ended state | night-cycle close |
 | 6 | WebSocket realtime via Durable Objects | DO fan-out, polling fallback |
 | 7 | Photo pipeline (R2 uploads, avatar UI, no facial recognition) | infra for photo-driven games |
+| 8a | Quiz Round game type + host CMS (packages, MCQ + T/F, image media, live host control + big-screen renderer) | content-authored game pattern; question-type plugins |
 
 ## Tier 1 — drop-in games (~1 weekend each)
 
@@ -21,6 +22,15 @@ These slot into `src/games/<name>/` with no new infrastructure. The architecture
 
 - **Mafia** — Bingo with a twist: 1–2 players get a *different* prompt set (the "impostors"). Everyone plays normally. At admin's signal a voting round runs — each player votes who they think the impostor was. Citizens score for correct votes; impostors score for going undetected. Implements as a new GameType with a `mafia_vote` event kind.
 - **Karaoke Queue** — not really a competitive game; a queue management feature presented through the GameType pattern. Players submit songs; queue projects on the big screen; admin advances the queue; optional "wingman" mission cards score points. Hooks naturally into existing DJ-night flow.
+
+### Tier 1 (within Quiz Round) — new question types
+
+Now that Phase 8a's question-type plugin pattern exists, these are folder-shaped additions inside `src/games/quiz-round/question-types/`, each ~100-200 lines (plugin + author / player / big-screen renderers). See `docs/GAMES.md` "How to add a new question type."
+
+- **Image-options MCQ** — answer options are images (e.g. "which Đà Nẵng street is this?"). Reuses photo pipeline.
+- **Free-text with fuzzy matching** — short typed answer, normalize + Levenshtein. Useful for "name the bartender" style questions.
+- **Ordering** — drag answer chips into the right order. Higher-effort UI but distinctive.
+- **Audio clip** — play a short clip on the big-screen, MCQ or free-text response. Needs Cloudflare Stream (v2) or R2 audio.
 
 ## Tier 2 — photo-driven games (photo pipeline already in place)
 
@@ -75,19 +85,30 @@ Worth thinking about, not yet justified.
 - **Drinking volume gamification.** Anything that rewards drinking-per-unit-time. Tempting, sociologically risky, and a venue-reputation problem if a regular ends up in trouble. Hard line.
 - **Persistent shame-shaped scores.** Single-game "least photographed" is fine as a one-night twist. A persistent leaderboard of "biggest losers" is not.
 
+## Quiz Round v2 / v3 backlog
+
+Carved out of Phase 8a scoping; deferred to keep the first ship narrow.
+
+- **v2: Video question media** — Cloudflare Stream with adaptive bitrate. Cap clip length (60s for v1 → maybe 120s).
+- **v2: Package cloning** — "fork last week's Pub Quiz" is high-value for Sam's recurring slot.
+- **v2: Library search / filter** — by author, last-used, status. Becomes useful once there are >20 packages.
+- **v2: Per-author URL slugs** — `/host/sam-h7x9k2` if the obscurity model starts feeling thin.
+- **v3: `package_bundle`** — a meta-package that strings sub-packages into a multi-round Pub Quiz Night macro (intermission cards, themed round titles). Held until standalone Quiz Round nights expose the actual shape.
+
 ## Infrastructure debt to pay down (when needed)
 
 Listed so we don't lose track:
 
 - **Rate limiting** on event POSTs and joins. KV-based per-IP counter; stop a motivated griefer from spamming claims. ~Half a day.
 - **Block / report** — table + admin queue UI. Half a day. Build when first abuse is seen.
-- **Score snapshots** — when reducer-from-events gets slow, store materialized state in `games.state_snapshot` and only re-reduce events newer than the snapshot.
+- **Score snapshots** — when reducer-from-events gets slow, store materialized state in `games.state_snapshot` and only re-reduce events newer than the snapshot. Quiz Round games with N players × N questions × ~3 events each can hit several thousand events per game.
 - **Auth.js D1 adapter schema verification** — flagged in `migrations/0000_init.sql`. Verify the schema matches the installed adapter version before first sign-in attempt in production.
-- **Real role-based admin** — replace the `ADMIN_EMAILS` env var soft gate with a `roles` table. Likely arrives alongside Membership.
+- **Real role-based admin** — replace the `ADMIN_EMAILS` env var soft gate with a `roles` table. Likely arrives alongside Membership. Will also formalize the `/host/*` allowlist (currently any signed-in user).
 - **Better dev experience** — `next dev` doesn't support DOs, so realtime and photo upload break locally. Either:
   - Add a `wrangler dev` workflow alongside, OR
   - Add a dev-only mock adapter that fakes WS + R2 against in-memory state.
 - **Test seed data** — script that populates a session + N fake players + a running game, so dev work doesn't require a manual-clicking ramp-up.
+- **Server-side timer auto-close** — Quiz Round timer is currently a UI hint; auto-closing requires DO alarms. Host can manually close, so deferred.
 
 ## Decision log
 

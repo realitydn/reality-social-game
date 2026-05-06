@@ -29,6 +29,17 @@ What's playable today and how to add a new game.
 - **Seed events:** `speed_pair_start` carries the initial pairing list; emitted via `onStart()`.
 - **Note:** Re-matching logic intentionally lives in the API handler (`src/app/api/games/[id]/events/route.ts`), not the reducer — generating new pair events from the queue is impure (reads state, writes events) and cleanly belongs at the orchestration layer.
 
+### Quiz Round
+- **Type key:** `quiz-round`
+- **Folder:** `src/games/quiz-round/`
+- **Mechanic:** Host-driven trivia round. The host opens questions one at a time from the host control panel; players answer on their phones (first answer wins, no overwrites); host reveals — close-question stops accepting answers and triggers per-player scoring; host advances to the next question. Optional auto-close timer is a hint to the player UI; the host can always reveal early or let it run past. Big-screen takes over the projector when the game type is `quiz-round`: question + options + live answer count + reveal coloring + inter-question leaderboard.
+- **Scoring:** Configurable per package. Default: 1000 points per correct answer with linear speed decay (full at 0ms, down to half at the timer mark). Materialized on reveal (one dramatic leaderboard jump per question), not per-answer. Late joiners can answer current and future questions; missed questions score zero.
+- **Content:** Loaded from a host-authored **package** (see `/host` CMS). Snapshotted into the `quiz_round_start` seed event at game start, so post-start edits to the source package don't affect the running game and replay stays deterministic.
+- **State shape:** `QuizRoundState` — frozen `questions[]`, `config`, `currentIdx`, `phase: lobby | question | revealed | ended`, `questionOpenedAt`, per-question `answers: { playerId → { value, elapsedMs, submittedAt } }`, `scores`, `reveals` log with per-player point deltas.
+- **Seed events:** `quiz_round_start` carries the host id + question snapshot + config; emitted via `onStart()` from `seedData` passed by the admin server action (which resolves the package id from `games.config`).
+- **Note:** Host control surfaces at `/session/[id]/host`. The reducer enforces `state.hostId === actorId` for `quiz_round_open_question`, `quiz_round_close_question`, `quiz_round_advance`, and `quiz_round_end` — non-host players' attempts are rejected at the validate step. Server computes `elapsedMs` for answers from `state.questionOpenedAt` rather than trusting client-supplied timing.
+- **Question types:** Pluggable. v1 ships `multiple-choice` and `true-false`. Each type is a folder under `src/games/quiz-round/question-types/<type>/` with pure `validateAnswer` / `isCorrect` / `scoreAnswer`. Adding a new type is one folder + one line in the question-type registry; player and big-screen renderers dispatch on `question.type`.
+
 ## Big-screen + leaderboard integration
 
 Every game gets the same projector treatment for free:
@@ -158,6 +169,88 @@ Pass the game's `prompts(locale)` labels through to `GameView`'s props.
 If your game has any app-level strings (not game-internal labels), add them to the message files for all four locales.
 
 That's the whole loop. A simple game (no facial recognition, no hardware) is roughly 200-400 lines of new code spread across the above files.
+
+## How to add a new question type (within Quiz Round)
+
+If your game *is* a new flavor of trivia (e.g. image-options MCQ, audio clip, free-text with fuzzy matching), don't make a new GameType — extend Quiz Round's question-type plugins instead. You inherit the host CMS, host control panel, big-screen renderer, scoring, and reveal flow for free.
+
+### 1. Create the plugin folder
+
+```
+src/games/quiz-round/question-types/<your-type>/
+  index.ts        # exports the QuestionType<Q, A> impl
+```
+
+### 2. Implement the contract
+
+`index.ts`:
+
+```ts
+import type { QuestionType } from "../types";
+
+export type YourQData = { /* shape */ };
+export type YourQAnswer = { /* shape */ };
+
+export const YourType: QuestionType<YourQData, YourQAnswer> = {
+  type: "your-type",
+  validateAnswer(q, a) { /* shape check */ },
+  isCorrect(q, a) { /* boolean */ },
+  scoreAnswer({ question, answer, elapsedMs, config }) { /* points */ },
+};
+```
+
+The plugin must be **pure** — no I/O, no `Date.now`, no `Math.random`. The reducer calls `scoreAnswer` deterministically during reveal, so any non-determinism breaks replay.
+
+### 3. Register
+
+`src/games/quiz-round/question-types/index.ts`:
+
+```ts
+import { YourType } from "./your-type";
+
+const REGISTRY = {
+  "multiple-choice": MultipleChoiceType,
+  "true-false": TrueFalseType,
+  "your-type": YourType,
+} as const satisfies Record<string, QuestionType<unknown, unknown>>;
+
+export const AUTHORABLE_QUESTION_TYPES = [
+  // ...existing...
+  { key: "your-type", label: "Your type" },
+];
+```
+
+### 4. Author-side editor
+
+`src/components/host/YourTypeEditor.tsx` — client component. Props: `{ questionId, data, onChange }`. Render whatever inputs your data shape needs.
+
+Wire dispatch in `src/components/host/QuestionEditor.tsx`:
+
+```tsx
+{question.type === "your-type" && (
+  <YourTypeEditor
+    questionId={question.id}
+    data={question.data as YourQData}
+    onChange={(d) => onChange({ ...question, data: d })}
+  />
+)}
+```
+
+### 5. Player + big-screen render
+
+Add render branches in `src/components/QuizRoundView.tsx` (player) and `src/components/QuizRoundBigScreen.tsx` (projector), keyed on `question.type`. Same dispatch pattern as the editor.
+
+That's it. Adding a 5th question type is roughly 100-200 lines spread across plugin + 3 render components. No core changes, no schema migration.
+
+## Quiz packages
+
+Authored content lives in the `packages` table — separate from `games`. A package is `{ id, name, game_type, author_id, config (JSON), content (JSON), status }`. The `content` blob's shape is owned by the consuming game type; for Quiz Round it's `{ questions: QuizRoundQuestion[] }`. No nested tables, so question shapes can evolve without migrations.
+
+The host CMS at `/host/*` is where authors build packages. Library lists everything (any signed-in user can create + edit; obscurity model for v1). Editor has a sticky save bar, per-question-type sub-editors, and per-question overrides for points + timer. Solo Preview at `/host/packages/[id]/preview` lets the host dry-run content without touching a session.
+
+To slot a package into a session, an admin picks it from the dropdown on the session page. The admin server action loads the package, builds a `QuizRoundSeed` (host id + questions snapshot + config), and passes it to `startGame(sessionId, "quiz-round", { config: { packageId }, seedData })`. The GameType's `onStart` reads `seedData` and emits `quiz_round_start` with the snapshot — replay-deterministic, immune to subsequent edits to the source package.
+
+Image media for question stems reuses the Phase 7 photo pipeline with `purpose='quiz-question'`. Video upload is deferred to v2 (Cloudflare Stream).
 
 ## Why state lives in events
 

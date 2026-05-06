@@ -32,10 +32,16 @@ export interface GameType<State, Event> {
 
   /**
    * Optional. Events to append when the game is started. Use this to seed
-   * shared state that depends on the player roster (e.g. assigning targets).
+   * shared state that depends on the player roster (e.g. assigning targets)
+   * or on resolved upstream config (e.g. a quiz-round game's package
+   * snapshot, passed in via `seedData` by the orchestration layer).
    * Pure state lives in the event log — the reducer handles these on replay.
    */
-  onStart?(ctx: GameContext, players: string[]): { kind: string; payload: unknown }[];
+  onStart?(
+    ctx: GameContext,
+    players: string[],
+    seedData?: unknown,
+  ): { kind: string; payload: unknown }[];
 }
 
 // The common shape of an event row as it's stored in `game_events`.

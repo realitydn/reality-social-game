@@ -61,6 +61,29 @@ interface GameType<State, Event> {
 
 `onStart` is the escape hatch for games that need to seed shared state from the player roster (Target Hunt's ring assignments, Speed Pair's initial pairings). The Bingo game doesn't define one — its cards are deterministic from `(sessionId, gameId, userId)`.
 
+Phase 8a extended `onStart` with an optional third `seedData` argument so content-driven games (Quiz Round) can have their package snapshot handed in by the orchestration layer without the GameType needing DB access. Existing games ignore it; their signatures are unchanged.
+
+## Authoring layer: packages and question-type plugins
+
+Some games (Quiz Round, future Pub Quiz, future card-deck games) need authored content separate from the game runtime. Phase 8a added two patterns to support this without leaking content concerns into the GameType abstraction:
+
+**Packages** are first-class authored entities, stored in `packages` (id, name, game_type, author_id, config, content, status). The `content` and `config` columns are JSON blobs whose shape is owned by the consuming game type — Quiz Round stores `{ questions: Question[] }` but a future deck-based game can use `{ cards: Card[] }` without a migration. Authored in the `/host/*` CMS; sign-in required, no further gate (obscurity model for v1).
+
+When an admin starts a content-driven game, the server action loads the package and calls:
+
+```ts
+startGame(sessionId, type, {
+  config:   { packageId },        // persisted on games.config for audit
+  seedData: { /* resolved package data */ },  // passed opaquely to onStart
+});
+```
+
+The GameType's `onStart` reads `seedData` and emits a seed event that snapshots the content into the event log. This decouples content loading (DB-bound, in the orchestration layer) from game logic (pure, in the reducer) and gives us replay determinism for free — the package can be edited or deleted after game start without affecting the running game.
+
+**Question-type plugins** are GameType-style plugins one level down. Inside `src/games/quiz-round/question-types/`, each type (`multiple-choice`, `true-false`, future `image-mcq`, `free-text`, `ordering`, `audio`) is a folder exporting a `QuestionType<Q, A>` with pure `validateAnswer`, `isCorrect`, `scoreAnswer`. Adding a new question type = one new folder + one registry line + 3 small render components (host editor, player UI, big-screen). The reducer dispatches by `question.type` and calls the plugin's pure functions during answer-validation and reveal-time scoring.
+
+The pattern generalizes: any future GameType that needs pluggable sub-content can apply the same shape (registry of pure plugins keyed by a type string, with separate render components in `src/components/`).
+
 ## Game lifecycle
 
 Sessions and games are separate concepts:
