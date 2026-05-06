@@ -14,7 +14,10 @@
     "locale": "Язык",
     "newsletter": "Присылать рассылку REALITY",
     "avatar": "Фото профиля",
-    "avatarComingSoon": "Фото профиля скоро появятся.",
+    "avatarChoose": "Выбрать фото",
+    "avatarUploading": "Загрузка…",
+    "avatarError": "Не удалось загрузить",
+    "avatarHelper": "Камера или фото с телефона — мы уменьшим его перед загрузкой.",
     "save": "Сохранить"
   },
   "scan": {

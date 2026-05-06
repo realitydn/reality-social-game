@@ -1,103 +1,74 @@
-# REALITY Social Game (working title)
+# REALITY Social Game
 
-A bar-floor party game played in person at REALITY (86 Mai Thúc Lân, Đà Nẵng). Find another player in the room, complete tasks together, score points, see yourself on the projected leaderboard.
+A bar-floor party game played in person at REALITY (86 Mai Thúc Lân, Đà Nẵng). Find another player in the room, do something with them, score points, see yourself on the projected leaderboard. Multiple game modes; one-night sessions with persistent leaderboards across nights.
 
-**Phase 0 scaffold:** auth, profile, i18n, REALITY brand chrome. Game modes and realtime layer arrive in Phase 1+.
+The repo is the venue's own piece of infrastructure — small enough to read end-to-end, deliberately built so adding a new game = dropping a folder.
+
+## What's in here right now
+
+Three playable games sharing one architecture (deterministic-card claims, chain-shifting tags, server-mediated re-pairing):
+
+- **Bingo** — 4×4 prompts in EN / VI / RU / UK; mutual-confirm via 4-char player codes
+- **Target Hunt** — non-elimination chain hunt; tag your target, inherit their target, chains converge
+- **Speed Pair** — auto-pair, both tap "done" → re-pair from a FIFO queue; score = meetings completed
+
+Plus the night-cycle plumbing:
+
+- QR check-in → guest signup → live attendee list → projected leaderboard → end-of-session winners splash
+- Persistent leaderboards (tonight / this week / all-time) at `/leaderboard`
+- WebSocket realtime via Durable Objects, 5s polling fallback
+- Photo upload pipeline (avatars; the same plumbing supports future photo-driven games)
+
+15 routes total. Build clean. Sessions span: admin creates → players join via QR → games run → admin ends → recap.
 
 ## Stack
 
 - **Next.js 15** (App Router) on **Cloudflare Workers** via `@opennextjs/cloudflare`
-- **Cloudflare D1** (database)
-- **Cloudflare Durable Objects** (planned, Phase 1) — one Durable Object per session, brokers realtime via WebSockets
-- **Cloudflare R2** (planned) — user avatars; **not yet enabled on the account**
-- **Auth.js v5** with Google OAuth + anonymous guest mode
-- **next-intl** for EN / VI / RU / UK (cookie-based, no path-based routing)
-- **Tailwind v4** with REALITY brand tokens (cream / ink + 8 chromatic swatches; Montserrat + Space Grotesk)
-- **Resend** for newsletter opt-in (sync wired in Phase 1)
+- **Cloudflare D1** for state (SQLite, append-only `game_events` log)
+- **Cloudflare Durable Objects** — one `SessionRoom` per session, in-memory WebSocket fan-out
+- **Cloudflare R2** for photo storage (avatars; future game uploads)
+- **Auth.js v5** (Google OAuth + anonymous guest sessions)
+- **next-intl** for EN / VI / RU / UK (cookie-based, no path prefixing)
+- **Tailwind v4** with REALITY brand tokens, Montserrat + Space Grotesk
+- **Resend** for newsletter opt-in sync (wired in later phase)
 
-## Local dev
+## Quick start
 
 ```bash
 npm install
 cp .env.example .env.local
-# Generate AUTH_SECRET: openssl rand -base64 32
-# Google OAuth creds optional for now — guest mode works without them
+# generate AUTH_SECRET (openssl rand -base64 32)
+# add your email to ADMIN_EMAILS
+npx wrangler login
+npx wrangler d1 create socialgame-state
+# paste returned database_id into wrangler.jsonc
+npm run db:apply:local
 npm run dev
 ```
 
-App runs at http://localhost:3000.
+For the full setup (Cloudflare + Google OAuth + R2 custom domain), see [`docs/SETUP.md`](docs/SETUP.md).
 
-## Cloudflare setup (one-time)
-
-```bash
-npx wrangler login
-
-# Create the D1 database, then paste the returned database_id into wrangler.jsonc.
-npx wrangler d1 create socialgame-state
-
-# Apply migrations locally + remotely.
-npm run db:apply:local
-npm run db:apply:remote   # after wrangler.jsonc has the real id
-
-# Enable R2 in the Cloudflare dashboard, then:
-# npx wrangler r2 bucket create reality-game-avatars
-# (also uncomment AVATARS in cloudflare-env.d.ts and the r2_buckets block in wrangler.jsonc)
-```
-
-## Production secrets
-
-```bash
-npx wrangler secret put AUTH_SECRET
-npx wrangler secret put AUTH_GOOGLE_ID
-npx wrangler secret put AUTH_GOOGLE_SECRET
-npx wrangler secret put RESEND_API_KEY
-npx wrangler secret put RESEND_AUDIENCE_ID
-```
-
-## Deploy
-
-```bash
-npm run deploy
-```
-
-## Layout
+## Project layout
 
 ```
 src/
-  app/
-    layout.tsx                       Fonts, locale provider, brand chrome
-    page.tsx                         Home — sign in or play as guest
-    profile/page.tsx                 Display name + locale + newsletter (avatar stubbed for R2)
-    api/auth/[...nextauth]/route.ts  Auth.js handlers
-  components/
-    Wordmark.tsx                     REALITY wordmark (Montserrat Alternates, 0.1em)
-    LocaleSwitcher.tsx               EN / VI / RU / UK toggle, cookie-based
-    SignInButtons.tsx                Google sign-in + guest entry
-  i18n/
-    locales.ts                       Locale constants
-    request.ts                       next-intl config (cookie + Accept-Language)
-  lib/
-    db.ts                            D1 binding from CF context
-    auth.ts                          Auth.js config (Google + D1 adapter)
-    session.ts                       getCurrentUser / createGuest / updateProfile
-messages/                            Translations: en / vi / ru / uk
-migrations/0000_init.sql             D1 schema (Auth.js + game state tables)
-wrangler.jsonc                       Cloudflare Worker bindings
-open-next.config.ts                  OpenNext adapter config
-cloudflare-env.d.ts                  CloudflareEnv interface augmentations
+  app/                    Next.js App Router (player + admin + big-screen pages, API routes)
+  components/             UI components (Bingo, TargetHunt, SpeedPair views; Leaderboard; AvatarUpload; etc.)
+  durable-objects/        SessionRoom DO (WebSocket fan-out)
+  games/                  GameType implementations — bingo, target-hunt, speed-pair
+  i18n/                   next-intl config, locale constants
+  lib/                    db, auth, sessions, games, events, photos, realtime, hashing
+messages/                 Translations: en / vi / ru / uk
+migrations/               D1 SQL migrations
+docs/                     Architecture, game catalog, roadmap, setup
+worker.ts                 Custom CF Worker entry — wraps OpenNext + exports SessionRoom
+wrangler.jsonc            Cloudflare bindings (D1, DO, R2, assets)
 ```
 
-## What's next
+## Documentation
 
-- **Phase 1**: sessions + presence (one night = one session, QR check-in, live attendee list, big-screen projection route)
-- **Phase 2**: first game (Bingo). Define the `GameType` interface — `init`, `reduce`, `validate`, `score`, `prompts(locale)`. New games live in `src/games/<name>/` and slot in via the `game_events` log without schema changes.
-- **Phase 3**: persistent leaderboards (nightly / weekly / all-time)
-- **Phase 4+**: more games (Target Hunt, Speed Pairing, …)
-
-## TODOs flagged in the code
-
-- `wrangler.jsonc` — paste real `database_id` after `wrangler d1 create socialgame-state`
-- `cloudflare-env.d.ts` — uncomment `AVATARS` binding after R2 is enabled
-- `next.config.ts` — uncomment the R2 image hostname when avatars are live
-- `src/app/profile/page.tsx` — avatar uploader stub waiting on R2
-- `migrations/0000_init.sql` — verify Auth.js D1 adapter schema matches the installed adapter version (`@auth/d1-adapter`) before first sign-in
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the design choices, reasoned through
+- [`docs/GAMES.md`](docs/GAMES.md) — catalog of built games + how to add a new one
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — the future, organized by tier
+- [`docs/SETUP.md`](docs/SETUP.md) — full deploy walkthrough
+- [`docs/MEMBERSHIP_HANDOFFS.md`](docs/MEMBERSHIP_HANDOFFS.md) — ideas for the REALITY Membership / Business Network project

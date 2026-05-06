@@ -8,7 +8,10 @@ declare global {
   interface CloudflareEnv {
     DB: D1Database;
     SESSION_ROOM: DurableObjectNamespace<SessionRoom>;
-    // AVATARS: R2Bucket;  // uncomment after enabling R2 + creating the bucket
+    PHOTOS: R2Bucket;
+    // Public base URL of the PHOTOS bucket (e.g. https://photos.realitydn.com).
+    // Set with `wrangler secret put PHOTOS_BASE_URL` in production.
+    PHOTOS_BASE_URL?: string;
   }
 }
 

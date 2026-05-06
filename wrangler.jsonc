@@ -34,12 +34,16 @@
       "new_sqlite_classes": ["SessionRoom"]
     }
   ],
-  // R2 binding (uncomment after enabling R2 + creating bucket):
-  // "r2_buckets": [
-  //   {
-  //     "binding": "AVATARS",
-  //     "bucket_name": "reality-game-avatars"
-  //   }
-  // ],
+  // R2 bucket for user-uploaded photos (avatars + future game uploads).
+  // Enable R2 in the Cloudflare dashboard, then run:
+  //   npx wrangler r2 bucket create socialgame-photos
+  // Set up a custom domain (e.g. photos.realitydn.com) for public read access
+  // and put it in the PHOTOS_BASE_URL secret.
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "socialgame-photos"
+    }
+  ],
   "observability": { "enabled": true }
 }

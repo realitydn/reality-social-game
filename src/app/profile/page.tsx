@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createGuest, getCurrentUser, updateProfile } from "@/lib/session";
 import { LOCALES, LOCALE_LABELS, isLocale, type Locale } from "@/i18n/locales";
+import AvatarUpload from "@/components/AvatarUpload";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import Wordmark from "@/components/Wordmark";
 
@@ -53,16 +54,24 @@ export default async function ProfilePage({
             {t("heading")}
           </h1>
 
+          {/* Avatar lives outside the main form — uploads happen separately so the
+              user gets immediate feedback without losing form state. */}
+          <div className="mb-6">
+            <label className="font-display font-semibold text-xs uppercase block mb-2" style={{ letterSpacing: "0.05em" }}>
+              {t("avatar")}
+            </label>
+            <AvatarUpload
+              initialUrl={user.image ?? null}
+              labels={{
+                chooseFile: t("avatarChoose"),
+                uploading: t("avatarUploading"),
+                error: t("avatarError"),
+                helper: t("avatarHelper"),
+              }}
+            />
+          </div>
+
           <form action={save} className="flex flex-col gap-6">
-            {/* Avatar — stubbed until R2 is enabled */}
-            <div>
-              <label className="font-display font-semibold text-xs uppercase block mb-2">
-                {t("avatar")}
-              </label>
-              <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
-                {t("avatarComingSoon")}
-              </div>
-            </div>
 
             <div>
               <label

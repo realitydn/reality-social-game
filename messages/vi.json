@@ -14,7 +14,10 @@
     "locale": "Ngôn ngữ",
     "newsletter": "Gửi cho tôi bản tin REALITY",
     "avatar": "Ảnh hồ sơ",
-    "avatarComingSoon": "Ảnh hồ sơ sẽ sớm ra mắt.",
+    "avatarChoose": "Chọn ảnh",
+    "avatarUploading": "Đang tải lên…",
+    "avatarError": "Không tải lên được",
+    "avatarHelper": "Chụp hoặc chọn từ điện thoại — chúng tôi sẽ thu nhỏ trước khi tải.",
     "save": "Lưu"
   },
   "scan": {

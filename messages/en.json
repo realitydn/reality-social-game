@@ -14,7 +14,10 @@
     "locale": "Language",
     "newsletter": "Send me the REALITY newsletter",
     "avatar": "Profile photo",
-    "avatarComingSoon": "Profile photos coming soon.",
+    "avatarChoose": "Choose a photo",
+    "avatarUploading": "Uploading…",
+    "avatarError": "Could not upload",
+    "avatarHelper": "Camera or photo from your phone — we resize it before upload.",
     "save": "Save"
   },
   "scan": {
