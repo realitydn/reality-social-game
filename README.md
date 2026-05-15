@@ -6,20 +6,23 @@ The repo is the venue's own piece of infrastructure — small enough to read end
 
 ## What's in here right now
 
-Three playable games sharing one architecture (deterministic-card claims, chain-shifting tags, server-mediated re-pairing):
+Four playable games sharing one architecture (deterministic-card claims, chain-shifting tags, server-mediated re-pairing, host-driven question rounds):
 
 - **Bingo** — 4×4 prompts in EN / VI / RU / UK; mutual-confirm via 4-char player codes
 - **Target Hunt** — non-elimination chain hunt; tag your target, inherit their target, chains converge
 - **Speed Pair** — auto-pair, both tap "done" → re-pair from a FIFO queue; score = meetings completed
+- **Quiz Round** — host-driven trivia from an authored package; per-package timer / scoring / leaderboard knobs; question-type plugins (MCQ + T/F ship; image-MCQ, free-text, audio etc. slot in as new folders)
 
 Plus the night-cycle plumbing:
 
 - QR check-in → guest signup → live attendee list → projected leaderboard → end-of-session winners splash
 - Persistent leaderboards (tonight / this week / all-time) at `/leaderboard`
 - WebSocket realtime via Durable Objects, 5s polling fallback
-- Photo upload pipeline (avatars; the same plumbing supports future photo-driven games)
+- Photo upload pipeline (avatars + Quiz Round question media; the same plumbing supports future photo-driven games)
+- Host CMS at `/host/*` for authoring quiz packages — library, editor with per-question-type sub-editors, image upload, solo preview
+- Live host control panel at `/session/[id]/host` for advancing questions during a Quiz Round; big-screen takes over the projector with question display + live counts + reveal coloring
 
-15 routes total. Build clean. Sessions span: admin creates → players join via QR → games run → admin ends → recap.
+22 routes. Build clean. Sessions span: admin creates → players join via QR → games run → admin ends → recap.
 
 ## Stack
 
@@ -52,12 +55,21 @@ For the full setup (Cloudflare + Google OAuth + R2 custom domain), see [`docs/SE
 
 ```
 src/
-  app/                    Next.js App Router (player + admin + big-screen pages, API routes)
-  components/             UI components (Bingo, TargetHunt, SpeedPair views; Leaderboard; AvatarUpload; etc.)
+  app/
+    admin/                Session lifecycle (create / start game / end)
+    host/                 Quiz package authoring CMS (library, editor, preview)
+    session/[id]/host/    Live host control during a Quiz Round game
+    big-screen/[id]/      Projector view (Quiz Round takes the stage when active)
+    api/                  Routes: events, packages, photos upload, session state
+    s/[id]/, session/[id] Player join + play pages
+  components/             Shared UI; per-game player views; per-question-type renderers
+    host/                 Author-side editor components (PackageEditor, QuestionEditor, MCQ/TF sub-editors)
   durable-objects/        SessionRoom DO (WebSocket fan-out)
-  games/                  GameType implementations — bingo, target-hunt, speed-pair
+  games/                  GameType implementations — bingo, target-hunt, speed-pair, quiz-round
+    quiz-round/
+      question-types/     Pluggable question types (multiple-choice, true-false, future image-mcq etc.)
   i18n/                   next-intl config, locale constants
-  lib/                    db, auth, sessions, games, events, photos, realtime, hashing
+  lib/                    db, auth, sessions, games, events, packages, photos, realtime, hashing
 messages/                 Translations: en / vi / ru / uk
 migrations/               D1 SQL migrations
 docs/                     Architecture, game catalog, roadmap, setup
