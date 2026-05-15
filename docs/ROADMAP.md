@@ -17,6 +17,7 @@ Where this app might go, organized by how much it costs to get there. Shipped ph
 | 8a | Quiz Round game type + host CMS (packages, MCQ + T/F, image media, live host control + big-screen renderer) | content-authored game pattern; question-type plugins |
 | 9 | Karaoke Queue (first non-competitive game; free-text submissions, host CRUDs the queue, big-screen now-up + up-next + history strip) | host-driven game pattern generalized via `HOST_DRIVEN_GAMES` |
 | 10 | Quiz Round question types: free-text (Levenshtein) + ordering (drag-and-drop) + audio-MCQ (R2-hosted clips) + per-option images for MCQ | photo upload pipeline extended to audio MIME types; deterministic per-player shuffle util |
+| 11 | Disposable Camera (host-configured photo capture + audience voting + projector reveal); host start-form pattern (`GAMES_WITH_CUSTOM_START_FORM`) | second non-competitive game; client-side 2048px downscale + bumped Worker image limit |
 
 ## Tier 1 — drop-in games (~1 weekend each)
 
@@ -39,8 +40,8 @@ Phase 10 shipped multiple-choice (with per-option images), true-false, free-text
 Now that uploads + R2 + the `photos` table exist, these are mostly UI + reducer work.
 
 - **Photo Bingo Pro** — Bingo where the prompt requires a photo to claim ("a selfie with someone wearing red"). Photo gets attached to the claim event; target's confirm reviews the photo. Optional AI verification later via Cloudflare Workers AI multimodal models.
-- **Disposable Camera** — each player gets N photos for the night, no other game mechanics. All pooled, projected at end as a slideshow. Audience votes on best 5; winners named "Photographers of the Night." Trades competition for collaborative memory-making.
 - **Pose Bingo** — projector shows a target pose; players upload selfies attempting it; audience or AI scores similarity. A high-effort, high-memory variant.
+- **Disposable Camera v2** — full archival-resolution shots via R2 presigned PUTs (Phase 11 ships pragmatic 2048px). Worth doing once we have a clear archival use case (Donald wants REALITY's collected photo history pristine, or printed annual zine, etc).
 
 ## Tier 3 — hardware integration (ESP32 + venue infrastructure)
 

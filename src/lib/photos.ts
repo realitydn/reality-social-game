@@ -29,7 +29,9 @@ const ALLOWED_PURPOSES: ReadonlySet<PhotoPurpose> = new Set([
   "quiz-question",
   "quiz-audio",
 ]);
-const MAX_BYTES_IMAGE = 1_500_000; // 1.5 MB post-resize covers any image use
+// 3 MB covers Disposable Camera's 2048px-long-edge JPEGs at q=0.9 with
+// headroom; avatars + quiz-question images stay well under this anyway.
+const MAX_BYTES_IMAGE = 3_000_000;
 const MAX_BYTES_AUDIO = 5_000_000; // 5 MB covers ~3 min of decent-quality MP3
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const ALLOWED_AUDIO_TYPES = new Set([

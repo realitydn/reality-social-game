@@ -11,6 +11,10 @@ import type { TargetHuntEvent, TargetHuntState } from "@/games/target-hunt/state
 import type { SpeedPairEvent, SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundEvent, QuizRoundState } from "@/games/quiz-round/state";
 import type { KaraokeEvent, KaraokeQueueState } from "@/games/karaoke-queue/state";
+import type {
+  DisposableCameraState,
+  DisposableEvent,
+} from "@/games/disposable-camera/state";
 
 type BingoClaimBody = {
   kind: "bingo_claim";
@@ -36,6 +40,16 @@ type KaraokeReorderBody = { kind: "karaoke_reorder"; orderedIds: string[] };
 type KaraokeCompleteBody = { kind: "karaoke_complete"; requestId: string };
 type KaraokeDeleteBody = { kind: "karaoke_delete"; requestId: string };
 type KaraokeEndBody = { kind: "karaoke_end" };
+type DisposableUploadBody = {
+  kind: "disposable_photo_upload";
+  photoId: string;
+  url: string;
+};
+type DisposableDeleteBody = { kind: "disposable_photo_delete"; photoId: string };
+type DisposableOpenVotingBody = { kind: "disposable_open_voting" };
+type DisposableVoteBody = { kind: "disposable_vote"; photoIds: string[] };
+type DisposableOpenRevealBody = { kind: "disposable_open_reveal" };
+type DisposableEndBody = { kind: "disposable_end" };
 type EventBody =
   | BingoClaimBody
   | BingoResolveBody
@@ -52,7 +66,13 @@ type EventBody =
   | KaraokeReorderBody
   | KaraokeCompleteBody
   | KaraokeDeleteBody
-  | KaraokeEndBody;
+  | KaraokeEndBody
+  | DisposableUploadBody
+  | DisposableDeleteBody
+  | DisposableOpenVotingBody
+  | DisposableVoteBody
+  | DisposableOpenRevealBody
+  | DisposableEndBody;
 
 export async function POST(
   req: NextRequest,
@@ -454,6 +474,99 @@ export async function POST(
       payload: { at: now },
     });
     await notifySession(game.session_id, "karaoke_end");
+    return NextResponse.json({ ok: true });
+  }
+
+  // ───────────── Disposable Camera ─────────────
+  if (body.kind === "disposable_photo_upload") {
+    const state = (await getGameState(game)) as DisposableCameraState;
+    const event: DisposableEvent = {
+      kind: "disposable_photo_upload",
+      id: body.photoId,
+      uploaderId: user.id,
+      url: body.url,
+      uploadedAt: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: body.photoId,
+      gameId: game.id,
+      kind: "disposable_photo_upload",
+      actorId: user.id,
+      targetId: null,
+      payload: {
+        id: body.photoId,
+        uploaderId: user.id,
+        url: body.url,
+        uploadedAt: now,
+      },
+    });
+    await notifySession(game.session_id, "disposable_photo_upload");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "disposable_photo_delete") {
+    const state = (await getGameState(game)) as DisposableCameraState;
+    const event: DisposableEvent = {
+      kind: "disposable_photo_delete",
+      photoId: body.photoId,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "disposable_photo_delete",
+      actorId: user.id,
+      targetId: null,
+      payload: { photoId: body.photoId, at: now },
+    });
+    await notifySession(game.session_id, "disposable_photo_delete");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "disposable_vote") {
+    const state = (await getGameState(game)) as DisposableCameraState;
+    const event: DisposableEvent = {
+      kind: "disposable_vote",
+      voterId: user.id,
+      photoIds: Array.isArray(body.photoIds) ? body.photoIds : [],
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "disposable_vote",
+      actorId: user.id,
+      targetId: null,
+      payload: { voterId: user.id, photoIds: event.photoIds, at: now },
+    });
+    await notifySession(game.session_id, "disposable_vote");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (
+    body.kind === "disposable_open_voting" ||
+    body.kind === "disposable_open_reveal" ||
+    body.kind === "disposable_end"
+  ) {
+    const state = (await getGameState(game)) as DisposableCameraState;
+    const event: DisposableEvent = { kind: body.kind, at: now };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: body.kind,
+      actorId: user.id,
+      targetId: null,
+      payload: { at: now },
+    });
+    await notifySession(game.session_id, body.kind);
     return NextResponse.json({ ok: true });
   }
 

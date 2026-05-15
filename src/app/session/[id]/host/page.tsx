@@ -6,8 +6,10 @@ import { getCurrentUser } from "@/lib/session";
 import { HOST_DRIVEN_GAMES } from "@/games/registry";
 import type { QuizRoundState } from "@/games/quiz-round/state";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
+import type { DisposableCameraState } from "@/games/disposable-camera/state";
 import HostControlPanel from "@/components/HostControlPanel";
 import KaraokeHostPanel from "@/components/KaraokeHostPanel";
+import DisposableHostPanel from "@/components/DisposableHostPanel";
 import Wordmark from "@/components/Wordmark";
 
 // Live host control during a host-driven game (Quiz Round, Karaoke Queue,
@@ -108,6 +110,14 @@ export default async function SessionHostPage({
             sessionId={id}
             gameId={game.id}
             initialState={rawState as KaraokeQueueState}
+            initialPlayers={players}
+          />
+        )}
+        {game.type === "disposable-camera" && (
+          <DisposableHostPanel
+            sessionId={id}
+            gameId={game.id}
+            initialState={rawState as DisposableCameraState}
             initialPlayers={players}
           />
         )}

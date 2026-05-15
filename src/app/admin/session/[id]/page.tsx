@@ -4,6 +4,7 @@ import { endSession, getSession, listPlayers } from "@/lib/sessions";
 import { endGame, getActiveGame, startGame } from "@/lib/games";
 import {
   GAMES_REQUIRING_PACKAGE,
+  GAMES_WITH_CUSTOM_START_FORM,
   HOST_DRIVEN_GAMES,
   PLAYABLE_GAME_TYPES,
 } from "@/games/registry";
@@ -15,6 +16,12 @@ import {
   type QuizRoundQuestion,
 } from "@/games/quiz-round/state";
 import type { QuizRoundSeed } from "@/games/quiz-round";
+import {
+  DEFAULT_DISPOSABLE_CAMERA_CONFIG,
+  type CameraDirection,
+  type DisposableCameraConfig,
+} from "@/games/disposable-camera/state";
+import type { DisposableCameraSeed } from "@/games/disposable-camera";
 import { getBaseUrl } from "@/lib/url";
 import AttendeeList from "@/components/AttendeeList";
 import Wordmark from "@/components/Wordmark";
@@ -78,6 +85,29 @@ export default async function AdminSessionPage({
     await startGame(id, "quiz-round", {
       config: { packageId, packageName: pkg.name },
       seedData: seed,
+    });
+    redirect(`/admin/session/${id}`);
+  }
+
+  async function startDisposableCamera(formData: FormData) {
+    "use server";
+    const user = await getCurrentUser();
+    if (!user) return;
+    const photosRaw = parseInt(String(formData.get("photosPerPlayer") ?? "5"), 10);
+    const votesRaw = parseInt(String(formData.get("votesPerPlayer") ?? "3"), 10);
+    const directionRaw = String(formData.get("cameraDirection") ?? "either");
+    const config: DisposableCameraConfig = {
+      photosPerPlayer: Math.min(50, Math.max(1, Number.isFinite(photosRaw) ? photosRaw : 5)),
+      cameraDirection: (["front", "back", "either"] as const).includes(
+        directionRaw as CameraDirection,
+      )
+        ? (directionRaw as CameraDirection)
+        : "either",
+      votesPerPlayer: Math.min(20, Math.max(1, Number.isFinite(votesRaw) ? votesRaw : 3)),
+    };
+    await startGame(id, "disposable-camera", {
+      config,
+      seedData: { hostId: user.id, config } satisfies DisposableCameraSeed,
     });
     redirect(`/admin/session/${id}`);
   }
@@ -167,7 +197,7 @@ export default async function AdminSessionPage({
             {!session.ends_at && (
               <div className="flex flex-wrap gap-2">
                 {PLAYABLE_GAME_TYPES.filter(
-                  (g) => !GAMES_REQUIRING_PACKAGE.has(g.key),
+                  (g) => !GAMES_WITH_CUSTOM_START_FORM.has(g.key),
                 ).map((g) => (
                   <form key={g.key} action={startSimpleGame}>
                     <input type="hidden" name="type" value={g.key} />
@@ -184,6 +214,64 @@ export default async function AdminSessionPage({
                   </form>
                 ))}
               </div>
+            )}
+
+            {!session.ends_at && (
+              <form
+                action={startDisposableCamera}
+                className="flex flex-wrap gap-2 items-stretch border border-dashed border-ink/30 p-2"
+              >
+                <span
+                  className="font-display font-semibold text-xs uppercase text-ink/60 self-center px-1"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  Disposable Camera
+                </span>
+                <label className="flex items-center gap-1 font-body text-xs text-ink/60">
+                  Photos
+                  <input
+                    type="number"
+                    name="photosPerPlayer"
+                    min={1}
+                    max={50}
+                    defaultValue={DEFAULT_DISPOSABLE_CAMERA_CONFIG.photosPerPlayer}
+                    className="border-2 border-ink px-1 py-0.5 w-16 font-body text-sm"
+                  />
+                </label>
+                <label className="flex items-center gap-1 font-body text-xs text-ink/60">
+                  Camera
+                  <select
+                    name="cameraDirection"
+                    defaultValue={DEFAULT_DISPOSABLE_CAMERA_CONFIG.cameraDirection}
+                    className="border-2 border-ink px-1 py-0.5 font-body text-sm"
+                  >
+                    <option value="either">Either</option>
+                    <option value="front">Front (selfie)</option>
+                    <option value="back">Back (room)</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-1 font-body text-xs text-ink/60">
+                  Votes
+                  <input
+                    type="number"
+                    name="votesPerPlayer"
+                    min={1}
+                    max={20}
+                    defaultValue={DEFAULT_DISPOSABLE_CAMERA_CONFIG.votesPerPlayer}
+                    className="border-2 border-ink px-1 py-0.5 w-16 font-body text-sm"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                  style={{
+                    letterSpacing: "0.05em",
+                    boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
+                  }}
+                >
+                  {game ? "Switch to Disposable Camera" : "Start Disposable Camera"}
+                </button>
+              </form>
             )}
 
             {!session.ends_at && (

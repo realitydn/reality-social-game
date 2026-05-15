@@ -4,6 +4,7 @@ import { TargetHuntGame } from "./target-hunt";
 import { SpeedPairGame } from "./speed-pair";
 import { QuizRoundGame } from "./quiz-round";
 import { KaraokeQueueGame } from "./karaoke-queue";
+import { DisposableCameraGame } from "./disposable-camera";
 
 // Registry of all playable game types. Adding a new game = importing it here
 // and listing it. Everything else (lifecycle, persistence, scoring) is generic.
@@ -13,6 +14,7 @@ const REGISTRY = {
   "speed-pair": SpeedPairGame,
   "quiz-round": QuizRoundGame,
   "karaoke-queue": KaraokeQueueGame,
+  "disposable-camera": DisposableCameraGame,
 } as const satisfies Record<string, GameType<unknown, unknown>>;
 
 export type GameTypeKey = keyof typeof REGISTRY;
@@ -31,6 +33,15 @@ export const GAMES_REQUIRING_PACKAGE: ReadonlySet<string> = new Set([
 export const HOST_DRIVEN_GAMES: ReadonlySet<string> = new Set([
   "quiz-round",
   "karaoke-queue",
+  "disposable-camera",
+]);
+
+// Game types that render their own start form on the admin session page
+// (e.g. Quiz Round needs a package picker, Disposable Camera needs config
+// sliders). The simple-game start button list filters these out.
+export const GAMES_WITH_CUSTOM_START_FORM: ReadonlySet<string> = new Set([
+  "quiz-round",
+  "disposable-camera",
 ]);
 
 export const PLAYABLE_GAME_TYPES: { key: GameTypeKey; label: string }[] = [
@@ -39,6 +50,7 @@ export const PLAYABLE_GAME_TYPES: { key: GameTypeKey; label: string }[] = [
   { key: "speed-pair", label: "Speed Pair" },
   { key: "quiz-round", label: "Quiz Round" },
   { key: "karaoke-queue", label: "Karaoke Queue" },
+  { key: "disposable-camera", label: "Disposable Camera" },
 ];
 
 export function getGameType(key: string): GameType<unknown, unknown> | null {

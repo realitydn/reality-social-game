@@ -8,8 +8,10 @@ import Leaderboard from "@/components/Leaderboard";
 import SessionRecap from "@/components/SessionRecap";
 import QuizRoundBigScreen from "@/components/QuizRoundBigScreen";
 import KaraokeQueueBigScreen from "@/components/KaraokeQueueBigScreen";
+import DisposableCameraBigScreen from "@/components/DisposableCameraBigScreen";
 import type { QuizRoundState } from "@/games/quiz-round/state";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
+import type { DisposableCameraState } from "@/games/disposable-camera/state";
 
 // Big-screen / projector view. Public, no auth. Inverted REALITY palette
 // (ink ground + cream + a chromatic accent) for high contrast on the projector.
@@ -59,7 +61,9 @@ export default async function BigScreenPage({
   // Game types that take over the whole projector. Other game types keep
   // the QR-plus-sidebar layout below.
   const fullScreenGame =
-    game?.type === "quiz-round" || game?.type === "karaoke-queue";
+    game?.type === "quiz-round" ||
+    game?.type === "karaoke-queue" ||
+    game?.type === "disposable-camera";
 
   if (fullScreenGame) {
     return (
@@ -102,6 +106,15 @@ export default async function BigScreenPage({
             sessionId={session.id}
             initial={{
               gameState: gameState as KaraokeQueueState | null,
+              players,
+            }}
+          />
+        )}
+        {game?.type === "disposable-camera" && (
+          <DisposableCameraBigScreen
+            sessionId={session.id}
+            initial={{
+              gameState: gameState as DisposableCameraState | null,
               players,
             }}
           />

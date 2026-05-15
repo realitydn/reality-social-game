@@ -6,13 +6,14 @@ The repo is the venue's own piece of infrastructure — small enough to read end
 
 ## What's in here right now
 
-Five playable games sharing one architecture (deterministic-card claims, chain-shifting tags, server-mediated re-pairing, host-driven question rounds, host-managed song queue):
+Six playable games sharing one architecture (deterministic-card claims, chain-shifting tags, server-mediated re-pairing, host-driven question rounds, host-managed song queue, host-configured photo capture):
 
 - **Bingo** — 4×4 prompts in EN / VI / RU / UK; mutual-confirm via 4-char player codes
 - **Target Hunt** — non-elimination chain hunt; tag your target, inherit their target, chains converge
 - **Speed Pair** — auto-pair, both tap "done" → re-pair from a FIFO queue; score = meetings completed
 - **Quiz Round** — host-driven trivia from an authored package; per-package timer / scoring / leaderboard knobs; five question-type plugins (MCQ with per-option images, true/false, free-text with Levenshtein matching, ordering with drag-and-drop, audio-MCQ with R2-hosted clips); new types slot in as folders
 - **Karaoke Queue** — first non-competitive game; players submit a song title (one active per person), host arranges/edits/completes/deletes, big-screen shows now-up + up-next + history strip
+- **Disposable Camera** — second non-competitive game; host-configured photo budget per player (default 5) + camera direction (front / back / either) + vote count (default 3); audience voting opens after capture; "Photographers of the Night" reveal on the projector
 
 Plus the night-cycle plumbing:
 

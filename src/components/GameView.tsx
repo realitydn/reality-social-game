@@ -7,11 +7,13 @@ import TargetHuntView from "./TargetHuntView";
 import SpeedPairView from "./SpeedPairView";
 import QuizRoundView from "./QuizRoundView";
 import KaraokeQueueView from "./KaraokeQueueView";
+import DisposableCameraView from "./DisposableCameraView";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundState } from "@/games/quiz-round/state";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
+import type { DisposableCameraState } from "@/games/disposable-camera/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { Locale } from "@/i18n/locales";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
@@ -21,7 +23,8 @@ type AnyGameState =
   | TargetHuntState
   | SpeedPairState
   | QuizRoundState
-  | KaraokeQueueState;
+  | KaraokeQueueState
+  | DisposableCameraState;
 
 type Dashboard = {
   session: { id: string; name: string; ends_at: number | null };
@@ -41,6 +44,7 @@ type Props = {
   speedPairLabels: Record<string, string>;
   quizRoundLabels: Record<string, string>;
   karaokeQueueLabels: Record<string, string>;
+  disposableCameraLabels: Record<string, string>;
   pollMs?: number;
   noActiveGameMessage: string;
 };
@@ -54,6 +58,7 @@ export default function GameView({
   speedPairLabels,
   quizRoundLabels,
   karaokeQueueLabels,
+  disposableCameraLabels,
   pollMs = 5000,
   noActiveGameMessage,
 }: Props) {
@@ -133,6 +138,22 @@ export default function GameView({
 
   const handleKaraokeSubmit = useCallback(
     (songTitle: string) => postEvent({ kind: "karaoke_submit", songTitle }),
+    [postEvent],
+  );
+
+  const handleDisposableUploadConfirm = useCallback(
+    (photoId: string, url: string) =>
+      postEvent({ kind: "disposable_photo_upload", photoId, url }),
+    [postEvent],
+  );
+
+  const handleDisposableDelete = useCallback(
+    (photoId: string) => postEvent({ kind: "disposable_photo_delete", photoId }),
+    [postEvent],
+  );
+
+  const handleDisposableVote = useCallback(
+    (photoIds: string[]) => postEvent({ kind: "disposable_vote", photoIds }),
     [postEvent],
   );
 
@@ -218,6 +239,23 @@ export default function GameView({
         players={data.players}
         labels={karaokeQueueLabels}
         onSubmit={handleKaraokeSubmit}
+      />
+    );
+  }
+
+  if (data.game.type === "disposable-camera") {
+    const state = data.gameState as DisposableCameraState;
+    return (
+      <DisposableCameraView
+        state={state}
+        meId={data.me.user_id}
+        players={data.players}
+        labels={disposableCameraLabels}
+        sessionId={sessionId}
+        gameId={data.game.id}
+        onDeletePhoto={handleDisposableDelete}
+        onUploadConfirm={handleDisposableUploadConfirm}
+        onVote={handleDisposableVote}
       />
     );
   }

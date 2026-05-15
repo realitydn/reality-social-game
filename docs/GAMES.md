@@ -56,12 +56,22 @@ What's playable today and how to add a new game.
 - **Seed events:** `karaoke_start` carries the host id; emitted via `onStart()` from `seedData` passed by the admin server action (no content package needed).
 - **Note:** "One active request per user" is enforced both in `validate` (so the API rejects with a clear reason) and in the reducer (so replay stays correct under any hypothetical client races). Reorder is non-destructive — unknown ids are dropped, missing ids are appended, so the host can't accidentally lose items.
 
+### Disposable Camera
+- **Type key:** `disposable-camera`
+- **Folder:** `src/games/disposable-camera/`
+- **Mechanic:** Three-phase host-driven photo game. **Capturing** — each player gets up to N shots (host-configured, default 5) via their phone camera, direction set per-game (front / back / either); they can delete their own shots before voting opens. **Voting** — host opens voting; everyone sees the pooled grid and picks up to V favourites (host-configured, default 3); self-votes silently filtered. **Revealed** — top-voted shots take over the projector with photographer names + vote counts. **Ended** — frozen final podium.
+- **Scoring:** None — `score()` returns `{}` like Karaoke. The "Photographers of the Night" recognition is on the big-screen reveal, not in `session_players.score`, so persistent leaderboards aren't dominated by photo voting.
+- **State shape:** `DisposableCameraState` — `config` (photos/camera/votes), `phase` (`capturing` | `voting` | `revealed` | `ended`), `photos: DisposablePhoto[]`, `votes: { voterId → photoIds[] }`. The `tallyVotes(state)` helper exports a pure vote-count map for big-screen + host panel.
+- **Seed events:** `disposable_start` carries `hostId` + `config`; emitted via `onStart()` from `seedData` passed by the admin server action's config form (photos / camera / votes inputs).
+- **Photo pipeline:** Reuses the Phase 7 photo pipeline with new `disposable` purpose. Client-side downscales to 2048px long-edge JPEG q=0.9 (typically 500KB-1.5MB) — practical "full res" for screen viewing, stays under the bumped 3MB Worker limit, no need for presigned PUTs. Switch to presigned later if archival-grade res ever becomes a goal.
+- **Note:** Capture-time limit enforced both at validate + in the reducer. Self-vote attempts pass validate but get silently filtered by the reducer (so manipulated clients can't game it). Photo deletion strips the deleted id from any cast votes, keeping vote tallies consistent.
+
 ## Host-driven games
 
-Two of the five game types — Quiz Round and Karaoke Queue — are *host-driven*: a designated user (typically the staff member or patron running the game) controls flow at runtime. The pattern generalizes:
+Three of the six game types — Quiz Round, Karaoke Queue, Disposable Camera — are *host-driven*: a designated user (typically the staff member or patron running the game) controls flow at runtime. The pattern generalizes:
 
-- The admin server action passes `{ hostId: user.id }` via `seedData` when starting one of these games (registry exports `HOST_DRIVEN_GAMES` so admin can do this generically).
-- The GameType's `onStart` reads `seedData.hostId` and emits a seed event that captures it into state.
+- The admin server action passes `{ hostId: user.id }` via `seedData` when starting one of these games (registry exports `HOST_DRIVEN_GAMES` so admin can do this generically). For games that also need pre-start config (Quiz Round picks a package, Disposable Camera picks photo / camera / vote knobs), `GAMES_WITH_CUSTOM_START_FORM` is the corresponding flag — admin renders a per-game form instead of the simple one-button start.
+- The GameType's `onStart` reads `seedData.hostId` (and any other config) and emits a seed event that captures it into state.
 - The reducer enforces `state.hostId === actorId` for any host-only event in its `validate` step.
 - Admin shows a "Host control →" button to `/session/[id]/host` when a host-driven game is running. That route dispatches by `game.type` to the right control panel component.
 
