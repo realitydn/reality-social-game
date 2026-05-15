@@ -5,10 +5,16 @@
 import type { QuestionType } from "./types";
 import { MultipleChoiceType } from "./multiple-choice";
 import { TrueFalseType } from "./true-false";
+import { FreeTextType } from "./free-text";
+import { OrderingType } from "./ordering";
+import { AudioMCQType } from "./audio-mcq";
 
 const REGISTRY = {
   "multiple-choice": MultipleChoiceType,
   "true-false": TrueFalseType,
+  "free-text": FreeTextType,
+  "ordering": OrderingType,
+  "audio-mcq": AudioMCQType,
 } as const satisfies Record<string, QuestionType<unknown, unknown>>;
 
 export type QuestionTypeKey = keyof typeof REGISTRY;
@@ -20,4 +26,7 @@ export function getQuestionType(key: string): QuestionType<unknown, unknown> | n
 export const AUTHORABLE_QUESTION_TYPES: { key: QuestionTypeKey; label: string }[] = [
   { key: "multiple-choice", label: "Multiple choice" },
   { key: "true-false", label: "True / false" },
+  { key: "free-text", label: "Free text" },
+  { key: "ordering", label: "Ordering" },
+  { key: "audio-mcq", label: "Audio + MCQ" },
 ];

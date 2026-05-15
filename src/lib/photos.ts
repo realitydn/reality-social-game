@@ -1,7 +1,12 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDB } from "./db";
 
-export type PhotoPurpose = "avatar" | "photo-bingo" | "disposable" | "quiz-question";
+export type PhotoPurpose =
+  | "avatar"
+  | "photo-bingo"
+  | "disposable"
+  | "quiz-question"
+  | "quiz-audio";
 
 export type Photo = {
   id: string;
@@ -22,9 +27,19 @@ const ALLOWED_PURPOSES: ReadonlySet<PhotoPurpose> = new Set([
   "photo-bingo",
   "disposable",
   "quiz-question",
+  "quiz-audio",
 ]);
-const MAX_BYTES = 1_500_000; // 1.5 MB after client-side resize is plenty for avatars
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_BYTES_IMAGE = 1_500_000; // 1.5 MB post-resize covers any image use
+const MAX_BYTES_AUDIO = 5_000_000; // 5 MB covers ~3 min of decent-quality MP3
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_AUDIO_TYPES = new Set([
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/ogg",
+  "audio/wav",
+  "audio/webm",
+]);
+const ALLOWED_TYPES = new Set([...ALLOWED_IMAGE_TYPES, ...ALLOWED_AUDIO_TYPES]);
 
 export function isAllowedPurpose(value: string): value is PhotoPurpose {
   return ALLOWED_PURPOSES.has(value as PhotoPurpose);
@@ -32,8 +47,10 @@ export function isAllowedPurpose(value: string): value is PhotoPurpose {
 
 export function validatePhotoUpload(file: File): { ok: true } | { ok: false; reason: string } {
   if (!ALLOWED_TYPES.has(file.type))
-    return { ok: false, reason: "unsupported image type" };
-  if (file.size > MAX_BYTES) return { ok: false, reason: "file too large" };
+    return { ok: false, reason: "unsupported file type" };
+  const isAudio = ALLOWED_AUDIO_TYPES.has(file.type);
+  const limit = isAudio ? MAX_BYTES_AUDIO : MAX_BYTES_IMAGE;
+  if (file.size > limit) return { ok: false, reason: "file too large" };
   if (file.size === 0) return { ok: false, reason: "empty file" };
   return { ok: true };
 }
@@ -44,8 +61,31 @@ export function buildR2Key(
   photoId: string,
   contentType: string,
 ): string {
-  const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
+  const ext = extensionFor(contentType);
   return `${purpose}/${userId}/${photoId}.${ext}`;
+}
+
+function extensionFor(contentType: string): string {
+  switch (contentType) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/jpeg":
+      return "jpg";
+    case "audio/mpeg":
+      return "mp3";
+    case "audio/mp4":
+      return "m4a";
+    case "audio/ogg":
+      return "ogg";
+    case "audio/wav":
+      return "wav";
+    case "audio/webm":
+      return "weba";
+    default:
+      return "bin";
+  }
 }
 
 export async function getPhotosBucket(): Promise<R2Bucket | null> {

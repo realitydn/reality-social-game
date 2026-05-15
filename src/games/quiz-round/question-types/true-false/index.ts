@@ -1,4 +1,5 @@
 import type { QuestionType } from "../types";
+import { withSpeedBonus } from "../lib/scoring";
 
 export type TFData = {
   prompt: string;
@@ -20,10 +21,6 @@ export const TrueFalseType: QuestionType<TFData, TFAnswer> = {
   },
   scoreAnswer({ question, answer, elapsedMs, config }) {
     if (answer.value !== question.correctValue) return 0;
-    const base = config.basePoints;
-    if (!config.speedBonus || !config.timerSecs) return base;
-    const timerMs = config.timerSecs * 1000;
-    const ratio = 1 - elapsedMs / (timerMs * 2);
-    return Math.round(base * Math.max(0.5, Math.min(1, ratio)));
+    return withSpeedBonus(config.basePoints, elapsedMs, config);
   },
 };

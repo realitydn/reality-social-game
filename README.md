@@ -11,7 +11,7 @@ Five playable games sharing one architecture (deterministic-card claims, chain-s
 - **Bingo** — 4×4 prompts in EN / VI / RU / UK; mutual-confirm via 4-char player codes
 - **Target Hunt** — non-elimination chain hunt; tag your target, inherit their target, chains converge
 - **Speed Pair** — auto-pair, both tap "done" → re-pair from a FIFO queue; score = meetings completed
-- **Quiz Round** — host-driven trivia from an authored package; per-package timer / scoring / leaderboard knobs; question-type plugins (MCQ + T/F ship; image-MCQ, free-text, audio etc. slot in as new folders)
+- **Quiz Round** — host-driven trivia from an authored package; per-package timer / scoring / leaderboard knobs; five question-type plugins (MCQ with per-option images, true/false, free-text with Levenshtein matching, ordering with drag-and-drop, audio-MCQ with R2-hosted clips); new types slot in as folders
 - **Karaoke Queue** — first non-competitive game; players submit a song title (one active per person), host arranges/edits/completes/deletes, big-screen shows now-up + up-next + history strip
 
 Plus the night-cycle plumbing:

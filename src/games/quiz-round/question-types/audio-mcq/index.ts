@@ -1,27 +1,26 @@
 import type { QuestionType } from "../types";
 import { withSpeedBonus } from "../lib/scoring";
 
-export type MCQOption = {
+export type AudioMCQOption = {
   id: string;
   text: string;
-  /** Optional image URL alongside or in place of text. */
-  image?: string | null;
 };
 
-export type MCQData = {
+export type AudioMCQData = {
   prompt: string;
-  options: MCQOption[];
+  /** R2 URL of the audio file. Played in <audio> element on player phones
+   *  + on the big-screen. */
+  audioUrl: string;
+  options: AudioMCQOption[];
   correctOptionId: string;
-  /** Optional stem media (image URL). */
-  image?: string | null;
 };
 
-export type MCQAnswer = {
+export type AudioMCQAnswer = {
   optionId: string;
 };
 
-export const MultipleChoiceType: QuestionType<MCQData, MCQAnswer> = {
-  type: "multiple-choice",
+export const AudioMCQType: QuestionType<AudioMCQData, AudioMCQAnswer> = {
+  type: "audio-mcq",
   validateAnswer(q, a) {
     if (!a || typeof a.optionId !== "string") return false;
     return q.options.some((opt) => opt.id === a.optionId);

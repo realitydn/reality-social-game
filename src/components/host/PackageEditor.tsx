@@ -233,10 +233,10 @@ function defaultDataFor(typeKey: string): unknown {
     return {
       prompt: "",
       options: [
-        { id: crypto.randomUUID(), text: "" },
-        { id: crypto.randomUUID(), text: "" },
-        { id: crypto.randomUUID(), text: "" },
-        { id: crypto.randomUUID(), text: "" },
+        { id: crypto.randomUUID(), text: "", image: null },
+        { id: crypto.randomUUID(), text: "", image: null },
+        { id: crypto.randomUUID(), text: "", image: null },
+        { id: crypto.randomUUID(), text: "", image: null },
       ],
       correctOptionId: "",
       image: null,
@@ -244,6 +244,33 @@ function defaultDataFor(typeKey: string): unknown {
   }
   if (typeKey === "true-false") {
     return { prompt: "", correctValue: true, image: null };
+  }
+  if (typeKey === "free-text") {
+    return { prompt: "", acceptedAnswers: [""], image: null };
+  }
+  if (typeKey === "ordering") {
+    return {
+      prompt: "",
+      items: [
+        { id: crypto.randomUUID(), text: "" },
+        { id: crypto.randomUUID(), text: "" },
+        { id: crypto.randomUUID(), text: "" },
+      ],
+      image: null,
+    };
+  }
+  if (typeKey === "audio-mcq") {
+    return {
+      prompt: "",
+      audioUrl: "",
+      options: [
+        { id: crypto.randomUUID(), text: "" },
+        { id: crypto.randomUUID(), text: "" },
+        { id: crypto.randomUUID(), text: "" },
+        { id: crypto.randomUUID(), text: "" },
+      ],
+      correctOptionId: "",
+    };
   }
   return {};
 }

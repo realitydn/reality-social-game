@@ -5,6 +5,9 @@ import type { QuizRoundState } from "@/games/quiz-round/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { MCQData } from "@/games/quiz-round/question-types/multiple-choice";
 import type { TFData } from "@/games/quiz-round/question-types/true-false";
+import type { FreeTextData } from "@/games/quiz-round/question-types/free-text";
+import type { OrderingData } from "@/games/quiz-round/question-types/ordering";
+import type { AudioMCQData } from "@/games/quiz-round/question-types/audio-mcq";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
 
 type Dashboard = {
@@ -103,6 +106,25 @@ export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
       {q.type === "true-false" && (
         <TFBigScreen
           data={q.data as TFData}
+          submissions={submissions}
+          phase={state.phase}
+        />
+      )}
+      {q.type === "free-text" && (
+        <FreeTextBigScreen
+          data={q.data as FreeTextData}
+          phase={state.phase}
+        />
+      )}
+      {q.type === "ordering" && (
+        <OrderingBigScreen
+          data={q.data as OrderingData}
+          phase={state.phase}
+        />
+      )}
+      {q.type === "audio-mcq" && (
+        <AudioMCQBigScreen
+          data={q.data as AudioMCQData}
           submissions={submissions}
           phase={state.phase}
         />
@@ -250,6 +272,172 @@ function TFBigScreen({
               {showCorrect && (
                 <p className="font-display font-bold text-3xl tabular-nums mt-2">{count}</p>
               )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FreeTextBigScreen({
+  data,
+  phase,
+}: {
+  data: FreeTextData;
+  phase: QuizRoundState["phase"];
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      {data.image && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={data.image} alt="" className="max-h-64 object-contain mx-auto border-2 border-cream" />
+      )}
+      <h1
+        className="font-display font-bold text-5xl md:text-6xl uppercase text-cream leading-tight"
+        style={{ letterSpacing: "0.05em" }}
+      >
+        {data.prompt}
+      </h1>
+      <p className="font-display font-semibold text-2xl uppercase text-cream/60" style={{ letterSpacing: "0.05em" }}>
+        Type your answer on your phone
+      </p>
+      {phase === "revealed" && (
+        <div className="border-4 border-yellow bg-yellow/20 p-6">
+          <p className="font-display font-semibold text-base uppercase text-cream/70 mb-2" style={{ letterSpacing: "0.05em" }}>
+            Accepted answers
+          </p>
+          <p
+            className="font-display font-bold text-4xl uppercase text-yellow leading-tight"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            {data.acceptedAnswers.filter((a) => a.trim()).join("  ·  ")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrderingBigScreen({
+  data,
+  phase,
+}: {
+  data: OrderingData;
+  phase: QuizRoundState["phase"];
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      {data.image && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={data.image} alt="" className="max-h-48 object-contain mx-auto border-2 border-cream" />
+      )}
+      <h1
+        className="font-display font-bold text-5xl md:text-6xl uppercase text-cream leading-tight"
+        style={{ letterSpacing: "0.05em" }}
+      >
+        {data.prompt}
+      </h1>
+      <p className="font-display font-semibold text-xl uppercase text-cream/60" style={{ letterSpacing: "0.05em" }}>
+        {phase === "revealed" ? "Correct order:" : "Drag to order on your phone"}
+      </p>
+      <ol className="flex flex-col gap-2">
+        {data.items.map((it, i) => (
+          <li
+            key={it.id}
+            className={`border-4 p-3 flex items-center gap-3 ${
+              phase === "revealed"
+                ? "border-yellow bg-yellow/10 text-cream"
+                : "border-cream/40 text-cream/80"
+            }`}
+          >
+            {phase === "revealed" ? (
+              <span className="font-display font-bold text-3xl text-yellow tabular-nums w-12">
+                {i + 1}.
+              </span>
+            ) : (
+              <span className="font-display font-bold text-3xl text-cream/40 w-12">·</span>
+            )}
+            <span
+              className="font-display font-bold text-2xl uppercase"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {it.text}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function AudioMCQBigScreen({
+  data,
+  submissions,
+  phase,
+}: {
+  data: AudioMCQData;
+  submissions: Record<string, { value: unknown }>;
+  phase: QuizRoundState["phase"];
+}) {
+  const [playing, setPlaying] = useState(false);
+  const showCorrect = phase === "revealed";
+  const counts: Record<string, number> = {};
+  for (const a of Object.values(submissions)) {
+    const optId = (a.value as { optionId?: string }).optionId;
+    if (optId) counts[optId] = (counts[optId] ?? 0) + 1;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1
+        className="font-display font-bold text-5xl md:text-6xl uppercase text-cream leading-tight"
+        style={{ letterSpacing: "0.05em" }}
+      >
+        {data.prompt}
+      </h1>
+      {data.audioUrl && (
+        <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio
+            src={data.audioUrl}
+            controls
+            className="flex-1"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+          />
+          <span className="font-display font-semibold text-cream/60 text-base">
+            {playing ? "Playing…" : "Tap play"}
+          </span>
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {data.options.map((opt) => {
+          const isCorrect = showCorrect && opt.id === data.correctOptionId;
+          const count = counts[opt.id] ?? 0;
+          return (
+            <div
+              key={opt.id}
+              className={`border-4 p-4 ${
+                showCorrect
+                  ? isCorrect
+                    ? "border-yellow bg-yellow text-ink"
+                    : "border-cream/30 text-cream/40"
+                  : "border-cream text-cream"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className="font-display font-bold text-3xl uppercase truncate"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  {isCorrect && <span className="mr-2">✓</span>}
+                  {opt.text}
+                </span>
+                {showCorrect && (
+                  <span className="font-display font-bold text-2xl tabular-nums">{count}</span>
+                )}
+              </div>
             </div>
           );
         })}

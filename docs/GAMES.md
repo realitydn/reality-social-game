@@ -38,7 +38,14 @@ What's playable today and how to add a new game.
 - **State shape:** `QuizRoundState` — frozen `questions[]`, `config`, `currentIdx`, `phase: lobby | question | revealed | ended`, `questionOpenedAt`, per-question `answers: { playerId → { value, elapsedMs, submittedAt } }`, `scores`, `reveals` log with per-player point deltas.
 - **Seed events:** `quiz_round_start` carries the host id + question snapshot + config; emitted via `onStart()` from `seedData` passed by the admin server action (which resolves the package id from `games.config`).
 - **Note:** Host control surfaces at `/session/[id]/host`. The reducer enforces `state.hostId === actorId` for `quiz_round_open_question`, `quiz_round_close_question`, `quiz_round_advance`, and `quiz_round_end` — non-host players' attempts are rejected at the validate step. Server computes `elapsedMs` for answers from `state.questionOpenedAt` rather than trusting client-supplied timing.
-- **Question types:** Pluggable. v1 ships `multiple-choice` and `true-false`. Each type is a folder under `src/games/quiz-round/question-types/<type>/` with pure `validateAnswer` / `isCorrect` / `scoreAnswer`. Adding a new type is one folder + one line in the question-type registry; player and big-screen renderers dispatch on `question.type`.
+- **Question types:** Pluggable. Ships with five:
+  - `multiple-choice` — text + per-option images (Phase 10)
+  - `true-false`
+  - `free-text` — case-insensitive + diacritic-stripping + Levenshtein-tolerant matching against one or more host-listed accepted answers (Phase 10)
+  - `ordering` — drag-and-drop on player phones; deterministic per-player shuffle so each player gets a stable starting order across refreshes (Phase 10)
+  - `audio-mcq` — host uploads an audio clip (mp3 / m4a / ogg / wav / webm) to R2; players hear it on their phones via `<audio controls>`, big-screen has its own player for bar PA (Phase 10)
+  
+  Each type is a folder under `src/games/quiz-round/question-types/<type>/` with pure `validateAnswer` / `isCorrect` / `scoreAnswer`. Speed-bonus scoring is shared via `lib/scoring.ts`. Adding a new type is one folder + one line in the question-type registry + 4 small render branches (author editor, player UI, big-screen, package preview).
 
 ### Karaoke Queue
 - **Type key:** `karaoke-queue`

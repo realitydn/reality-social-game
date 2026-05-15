@@ -3,8 +3,14 @@
 import type { QuizRoundQuestion } from "@/games/quiz-round/state";
 import MultipleChoiceEditor from "./MultipleChoiceEditor";
 import TrueFalseEditor from "./TrueFalseEditor";
+import FreeTextEditor from "./FreeTextEditor";
+import OrderingEditor from "./OrderingEditor";
+import AudioMCQEditor from "./AudioMCQEditor";
 import type { MCQData } from "@/games/quiz-round/question-types/multiple-choice";
 import type { TFData } from "@/games/quiz-round/question-types/true-false";
+import type { FreeTextData } from "@/games/quiz-round/question-types/free-text";
+import type { OrderingData } from "@/games/quiz-round/question-types/ordering";
+import type { AudioMCQData } from "@/games/quiz-round/question-types/audio-mcq";
 
 type Props = {
   question: QuizRoundQuestion;
@@ -76,6 +82,27 @@ export default function QuestionEditor({
           onChange={(d) => onChange({ ...question, data: d })}
         />
       )}
+      {question.type === "free-text" && (
+        <FreeTextEditor
+          questionId={question.id}
+          data={question.data as FreeTextData}
+          onChange={(d) => onChange({ ...question, data: d })}
+        />
+      )}
+      {question.type === "ordering" && (
+        <OrderingEditor
+          questionId={question.id}
+          data={question.data as OrderingData}
+          onChange={(d) => onChange({ ...question, data: d })}
+        />
+      )}
+      {question.type === "audio-mcq" && (
+        <AudioMCQEditor
+          questionId={question.id}
+          data={question.data as AudioMCQData}
+          onChange={(d) => onChange({ ...question, data: d })}
+        />
+      )}
 
       <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-ink/20">
         <label className="flex items-center gap-2 font-body text-xs text-ink/60">
@@ -116,5 +143,8 @@ export default function QuestionEditor({
 function labelFor(typeKey: string): string {
   if (typeKey === "multiple-choice") return "Multiple choice";
   if (typeKey === "true-false") return "True / false";
+  if (typeKey === "free-text") return "Free text";
+  if (typeKey === "ordering") return "Ordering";
+  if (typeKey === "audio-mcq") return "Audio + MCQ";
   return typeKey;
 }

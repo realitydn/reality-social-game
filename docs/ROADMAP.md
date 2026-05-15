@@ -16,6 +16,7 @@ Where this app might go, organized by how much it costs to get there. Shipped ph
 | 7 | Photo pipeline (R2 uploads, avatar UI, no facial recognition) | infra for photo-driven games |
 | 8a | Quiz Round game type + host CMS (packages, MCQ + T/F, image media, live host control + big-screen renderer) | content-authored game pattern; question-type plugins |
 | 9 | Karaoke Queue (first non-competitive game; free-text submissions, host CRUDs the queue, big-screen now-up + up-next + history strip) | host-driven game pattern generalized via `HOST_DRIVEN_GAMES` |
+| 10 | Quiz Round question types: free-text (Levenshtein) + ordering (drag-and-drop) + audio-MCQ (R2-hosted clips) + per-option images for MCQ | photo upload pipeline extended to audio MIME types; deterministic per-player shuffle util |
 
 ## Tier 1 — drop-in games (~1 weekend each)
 
@@ -24,14 +25,14 @@ These slot into `src/games/<name>/` with no new infrastructure. The architecture
 - **Mafia** — Bingo with a twist: 1–2 players get a *different* prompt set (the "impostors"). Everyone plays normally. At admin's signal a voting round runs — each player votes who they think the impostor was. Citizens score for correct votes; impostors score for going undetected. Implements as a new GameType with a `mafia_vote` event kind.
 - **Karaoke Wingman missions** — sits on top of the Phase 9 Karaoke Queue. Optional "mission cards" score points (e.g. "be the first to cheer for someone you don't know"). Layered scoring on top of a non-competitive queue — interesting because it lets the same game flip between casual mode and competitive mode without forking the type.
 
-### Tier 1 (within Quiz Round) — new question types
+### Tier 1 (within Quiz Round) — further question types
 
-Now that Phase 8a's question-type plugin pattern exists, these are folder-shaped additions inside `src/games/quiz-round/question-types/`, each ~100-200 lines (plugin + author / player / big-screen renderers). See `docs/GAMES.md` "How to add a new question type."
+Phase 10 shipped multiple-choice (with per-option images), true-false, free-text, ordering, audio-mcq. Future additions slot in the same way (folder under `src/games/quiz-round/question-types/<type>/` + 4 render branches):
 
-- **Image-options MCQ** — answer options are images (e.g. "which Đà Nẵng street is this?"). Reuses photo pipeline.
-- **Free-text with fuzzy matching** — short typed answer, normalize + Levenshtein. Useful for "name the bartender" style questions.
-- **Ordering** — drag answer chips into the right order. Higher-effort UI but distinctive.
-- **Audio clip** — play a short clip on the big-screen, MCQ or free-text response. Needs Cloudflare Stream (v2) or R2 audio.
+- **LLM-judged free-text** — instead of Levenshtein matching, send the answer to a Workers AI model with a graded rubric. More forgiving than Levenshtein, no need to enumerate variants. Adds a runtime cost per answer.
+- **Numeric range** — "How many people work at REALITY?" with a tolerance band. Cheap, common in trivia.
+- **Multi-select MCQ** — pick all that apply. Scoring is the design call: full points for exact set match, or partial for each correct + penalty for wrong picks.
+- **Picture grid** — variant of image-MCQ where options are images only (no text). Already supported by the data shape; just a render variant.
 
 ## Tier 2 — photo-driven games (photo pipeline already in place)
 
