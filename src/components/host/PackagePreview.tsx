@@ -151,7 +151,7 @@ function PreviewQuestionRenderer({
                 type="button"
                 disabled={phase === "revealed"}
                 onClick={() => setAnswer({ optionId: opt.id })}
-                className={`border-2 p-4 font-body text-left transition ${
+                className={`border-2 p-4 font-body text-left transition flex items-center gap-3 ${
                   isRight
                     ? "bg-yellow text-ink border-yellow"
                     : isWrongPick
@@ -161,7 +161,15 @@ function PreviewQuestionRenderer({
                         : "border-cream/50 text-cream hover:bg-cream/10"
                 }`}
               >
-                {opt.text || "(empty option)"}
+                {opt.image && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={opt.image}
+                    alt=""
+                    className="h-12 w-12 object-cover border border-cream/30 shrink-0"
+                  />
+                )}
+                <span className="flex-1">{opt.text || "(empty option)"}</span>
               </button>
             );
           })}

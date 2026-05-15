@@ -222,9 +222,17 @@ function MCQPlayerInner({
               type="button"
               disabled={!!myAnswer || phase !== "question" || submitting}
               onClick={() => submit(opt.id)}
-              className={`border-2 p-4 font-body text-left transition disabled:cursor-not-allowed ${cls}`}
+              className={`border-2 p-4 font-body text-left transition disabled:cursor-not-allowed flex items-center gap-3 ${cls}`}
             >
-              {opt.text}
+              {opt.image && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={opt.image}
+                  alt=""
+                  className="h-14 w-14 object-cover border border-ink/30 shrink-0"
+                />
+              )}
+              <span className="flex-1">{opt.text}</span>
             </button>
           );
         })}

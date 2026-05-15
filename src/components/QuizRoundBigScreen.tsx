@@ -199,9 +199,17 @@ function MCQBigScreen({
                   style={{ width: `${pct}%` }}
                 />
               )}
-              <div className="relative flex items-center justify-between">
+              <div className="relative flex items-center gap-4">
+                {opt.image && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={opt.image}
+                    alt=""
+                    className="h-24 w-24 object-cover border-2 border-cream/30 shrink-0"
+                  />
+                )}
                 <span
-                  className="font-display font-bold text-3xl uppercase truncate"
+                  className="font-display font-bold text-3xl uppercase truncate flex-1"
                   style={{ letterSpacing: "0.05em" }}
                 >
                   {isCorrect && <span className="mr-2">✓</span>}
@@ -398,7 +406,6 @@ function AudioMCQBigScreen({
       </h1>
       {data.audioUrl && (
         <div className="flex items-center gap-4">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio
             src={data.audioUrl}
             controls
