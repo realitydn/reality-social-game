@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { endSession, getSession, listPlayers } from "@/lib/sessions";
 import { endGame, getActiveGame, startGame } from "@/lib/games";
-import { GAMES_REQUIRING_PACKAGE, PLAYABLE_GAME_TYPES } from "@/games/registry";
+import {
+  GAMES_REQUIRING_PACKAGE,
+  HOST_DRIVEN_GAMES,
+  PLAYABLE_GAME_TYPES,
+} from "@/games/registry";
 import { getPackage, listPackages } from "@/lib/packages";
 import { getCurrentUser } from "@/lib/session";
 import {
@@ -41,7 +45,14 @@ export default async function AdminSessionPage({
     const type = String(formData.get("type") ?? "");
     if (!type) return;
     if (GAMES_REQUIRING_PACKAGE.has(type)) return;
-    await startGame(id, type);
+    // Host-driven games (no package) need the hostId in seedData so the
+    // reducer can lock host events to the starter. Other games ignore it.
+    let options: Parameters<typeof startGame>[2] = {};
+    if (HOST_DRIVEN_GAMES.has(type)) {
+      const user = await getCurrentUser();
+      if (user) options = { seedData: { hostId: user.id } };
+    }
+    await startGame(id, type, options);
     redirect(`/admin/session/${id}`);
   }
 
@@ -117,7 +128,7 @@ export default async function AdminSessionPage({
           >
             Player link ↗
           </Link>
-          {game?.type === "quiz-round" && game.status === "running" && (
+          {game && HOST_DRIVEN_GAMES.has(game.type) && game.status === "running" && (
             <Link
               href={`/session/${session.id}/host`}
               className="bg-yellow text-ink font-display font-bold uppercase px-5 py-2 border-2 border-ink transition hover:translate-y-0.5"

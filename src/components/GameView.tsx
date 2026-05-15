@@ -6,15 +6,22 @@ import BingoPendingClaims from "./BingoPendingClaims";
 import TargetHuntView from "./TargetHuntView";
 import SpeedPairView from "./SpeedPairView";
 import QuizRoundView from "./QuizRoundView";
+import KaraokeQueueView from "./KaraokeQueueView";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { Locale } from "@/i18n/locales";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
 
-type AnyGameState = BingoState | TargetHuntState | SpeedPairState | QuizRoundState;
+type AnyGameState =
+  | BingoState
+  | TargetHuntState
+  | SpeedPairState
+  | QuizRoundState
+  | KaraokeQueueState;
 
 type Dashboard = {
   session: { id: string; name: string; ends_at: number | null };
@@ -33,6 +40,7 @@ type Props = {
   targetHuntLabels: Record<string, string>;
   speedPairLabels: Record<string, string>;
   quizRoundLabels: Record<string, string>;
+  karaokeQueueLabels: Record<string, string>;
   pollMs?: number;
   noActiveGameMessage: string;
 };
@@ -45,6 +53,7 @@ export default function GameView({
   targetHuntLabels,
   speedPairLabels,
   quizRoundLabels,
+  karaokeQueueLabels,
   pollMs = 5000,
   noActiveGameMessage,
 }: Props) {
@@ -122,6 +131,11 @@ export default function GameView({
     [postEvent],
   );
 
+  const handleKaraokeSubmit = useCallback(
+    (songTitle: string) => postEvent({ kind: "karaoke_submit", songTitle }),
+    [postEvent],
+  );
+
   if (!data.game || !data.gameState || !data.me) {
     return (
       <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
@@ -191,6 +205,19 @@ export default function GameView({
         meId={data.me.user_id}
         labels={quizRoundLabels}
         onAnswer={handleQuizAnswer}
+      />
+    );
+  }
+
+  if (data.game.type === "karaoke-queue") {
+    const state = data.gameState as KaraokeQueueState;
+    return (
+      <KaraokeQueueView
+        state={state}
+        meId={data.me.user_id}
+        players={data.players}
+        labels={karaokeQueueLabels}
+        onSubmit={handleKaraokeSubmit}
       />
     );
   }

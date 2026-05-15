@@ -15,13 +15,14 @@ Where this app might go, organized by how much it costs to get there. Shipped ph
 | 6 | WebSocket realtime via Durable Objects | DO fan-out, polling fallback |
 | 7 | Photo pipeline (R2 uploads, avatar UI, no facial recognition) | infra for photo-driven games |
 | 8a | Quiz Round game type + host CMS (packages, MCQ + T/F, image media, live host control + big-screen renderer) | content-authored game pattern; question-type plugins |
+| 9 | Karaoke Queue (first non-competitive game; free-text submissions, host CRUDs the queue, big-screen now-up + up-next + history strip) | host-driven game pattern generalized via `HOST_DRIVEN_GAMES` |
 
 ## Tier 1 — drop-in games (~1 weekend each)
 
 These slot into `src/games/<name>/` with no new infrastructure. The architecture is built for them.
 
 - **Mafia** — Bingo with a twist: 1–2 players get a *different* prompt set (the "impostors"). Everyone plays normally. At admin's signal a voting round runs — each player votes who they think the impostor was. Citizens score for correct votes; impostors score for going undetected. Implements as a new GameType with a `mafia_vote` event kind.
-- **Karaoke Queue** — not really a competitive game; a queue management feature presented through the GameType pattern. Players submit songs; queue projects on the big screen; admin advances the queue; optional "wingman" mission cards score points. Hooks naturally into existing DJ-night flow.
+- **Karaoke Wingman missions** — sits on top of the Phase 9 Karaoke Queue. Optional "mission cards" score points (e.g. "be the first to cheer for someone you don't know"). Layered scoring on top of a non-competitive queue — interesting because it lets the same game flip between casual mode and competitive mode without forking the type.
 
 ### Tier 1 (within Quiz Round) — new question types
 

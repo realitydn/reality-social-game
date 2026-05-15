@@ -8,10 +8,12 @@ import { BingoGame } from "@/games/bingo";
 import { TargetHuntGame } from "@/games/target-hunt";
 import { SpeedPairGame } from "@/games/speed-pair";
 import { QuizRoundGame } from "@/games/quiz-round";
+import { KaraokeQueueGame } from "@/games/karaoke-queue";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import { isLocale, type Locale } from "@/i18n/locales";
 import GameView from "@/components/GameView";
 import AttendeeList from "@/components/AttendeeList";
@@ -122,7 +124,8 @@ export default async function PlayerSessionPage({
         | BingoState
         | TargetHuntState
         | SpeedPairState
-        | QuizRoundState)
+        | QuizRoundState
+        | KaraokeQueueState)
     : null;
   const scores = game ? await getScores(game) : {};
 
@@ -130,6 +133,7 @@ export default async function PlayerSessionPage({
   const targetHuntLabels = TargetHuntGame.prompts(locale);
   const speedPairLabels = SpeedPairGame.prompts(locale);
   const quizRoundLabels = QuizRoundGame.prompts(locale);
+  const karaokeQueueLabels = KaraokeQueueGame.prompts(locale);
 
   const initialDashboard = {
     session: { id: session.id, name: session.name, ends_at: session.ends_at },
@@ -198,6 +202,7 @@ export default async function PlayerSessionPage({
             targetHuntLabels={targetHuntLabels}
             speedPairLabels={speedPairLabels}
             quizRoundLabels={quizRoundLabels}
+            karaokeQueueLabels={karaokeQueueLabels}
             noActiveGameMessage={t("noActiveGame")}
           />
         </div>

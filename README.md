@@ -6,12 +6,13 @@ The repo is the venue's own piece of infrastructure — small enough to read end
 
 ## What's in here right now
 
-Four playable games sharing one architecture (deterministic-card claims, chain-shifting tags, server-mediated re-pairing, host-driven question rounds):
+Five playable games sharing one architecture (deterministic-card claims, chain-shifting tags, server-mediated re-pairing, host-driven question rounds, host-managed song queue):
 
 - **Bingo** — 4×4 prompts in EN / VI / RU / UK; mutual-confirm via 4-char player codes
 - **Target Hunt** — non-elimination chain hunt; tag your target, inherit their target, chains converge
 - **Speed Pair** — auto-pair, both tap "done" → re-pair from a FIFO queue; score = meetings completed
 - **Quiz Round** — host-driven trivia from an authored package; per-package timer / scoring / leaderboard knobs; question-type plugins (MCQ + T/F ship; image-MCQ, free-text, audio etc. slot in as new folders)
+- **Karaoke Queue** — first non-competitive game; players submit a song title (one active per person), host arranges/edits/completes/deletes, big-screen shows now-up + up-next + history strip
 
 Plus the night-cycle plumbing:
 

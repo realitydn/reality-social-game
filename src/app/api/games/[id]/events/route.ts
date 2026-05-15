@@ -10,6 +10,7 @@ import type { BingoEvent, BingoState } from "@/games/bingo/state";
 import type { TargetHuntEvent, TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairEvent, SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundEvent, QuizRoundState } from "@/games/quiz-round/state";
+import type { KaraokeEvent, KaraokeQueueState } from "@/games/karaoke-queue/state";
 
 type BingoClaimBody = {
   kind: "bingo_claim";
@@ -29,6 +30,12 @@ type QuizAnswerBody = { kind: "quiz_round_answer"; value: unknown };
 type QuizCloseBody = { kind: "quiz_round_close_question" };
 type QuizAdvanceBody = { kind: "quiz_round_advance"; nextIdx: number };
 type QuizEndBody = { kind: "quiz_round_end" };
+type KaraokeSubmitBody = { kind: "karaoke_submit"; songTitle: string };
+type KaraokeEditBody = { kind: "karaoke_edit"; requestId: string; songTitle: string };
+type KaraokeReorderBody = { kind: "karaoke_reorder"; orderedIds: string[] };
+type KaraokeCompleteBody = { kind: "karaoke_complete"; requestId: string };
+type KaraokeDeleteBody = { kind: "karaoke_delete"; requestId: string };
+type KaraokeEndBody = { kind: "karaoke_end" };
 type EventBody =
   | BingoClaimBody
   | BingoResolveBody
@@ -39,7 +46,13 @@ type EventBody =
   | QuizAnswerBody
   | QuizCloseBody
   | QuizAdvanceBody
-  | QuizEndBody;
+  | QuizEndBody
+  | KaraokeSubmitBody
+  | KaraokeEditBody
+  | KaraokeReorderBody
+  | KaraokeCompleteBody
+  | KaraokeDeleteBody
+  | KaraokeEndBody;
 
 export async function POST(
   req: NextRequest,
@@ -330,6 +343,117 @@ export async function POST(
       },
     });
     await notifySession(game.session_id, "quiz_round_answer");
+    return NextResponse.json({ ok: true });
+  }
+
+  // ───────────── Karaoke Queue ─────────────
+  if (body.kind === "karaoke_submit") {
+    const state = (await getGameState(game)) as KaraokeQueueState;
+    const eventId = crypto.randomUUID();
+    const event: KaraokeEvent = {
+      kind: "karaoke_submit",
+      id: eventId,
+      playerId: user.id,
+      songTitle: body.songTitle,
+      submittedAt: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: eventId,
+      gameId: game.id,
+      kind: "karaoke_submit",
+      actorId: user.id,
+      targetId: null,
+      payload: {
+        id: eventId,
+        playerId: user.id,
+        songTitle: body.songTitle,
+        submittedAt: now,
+      },
+    });
+    await notifySession(game.session_id, "karaoke_submit");
+    return NextResponse.json({ ok: true, requestId: eventId });
+  }
+
+  if (body.kind === "karaoke_edit") {
+    const state = (await getGameState(game)) as KaraokeQueueState;
+    const event: KaraokeEvent = {
+      kind: "karaoke_edit",
+      requestId: body.requestId,
+      songTitle: body.songTitle,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "karaoke_edit",
+      actorId: user.id,
+      targetId: null,
+      payload: { requestId: body.requestId, songTitle: body.songTitle, at: now },
+    });
+    await notifySession(game.session_id, "karaoke_edit");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "karaoke_reorder") {
+    const state = (await getGameState(game)) as KaraokeQueueState;
+    const event: KaraokeEvent = {
+      kind: "karaoke_reorder",
+      orderedIds: body.orderedIds,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "karaoke_reorder",
+      actorId: user.id,
+      targetId: null,
+      payload: { orderedIds: body.orderedIds, at: now },
+    });
+    await notifySession(game.session_id, "karaoke_reorder");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "karaoke_complete" || body.kind === "karaoke_delete") {
+    const state = (await getGameState(game)) as KaraokeQueueState;
+    const event: KaraokeEvent = {
+      kind: body.kind,
+      requestId: body.requestId,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: body.kind,
+      actorId: user.id,
+      targetId: null,
+      payload: { requestId: body.requestId, at: now },
+    });
+    await notifySession(game.session_id, body.kind);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "karaoke_end") {
+    const state = (await getGameState(game)) as KaraokeQueueState;
+    const event: KaraokeEvent = { kind: "karaoke_end", at: now };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "karaoke_end",
+      actorId: user.id,
+      targetId: null,
+      payload: { at: now },
+    });
+    await notifySession(game.session_id, "karaoke_end");
     return NextResponse.json({ ok: true });
   }
 

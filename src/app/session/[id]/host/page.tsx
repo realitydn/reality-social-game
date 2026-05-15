@@ -3,12 +3,16 @@ import Link from "next/link";
 import { getSession, listPlayers } from "@/lib/sessions";
 import { getActiveGame, getGameState } from "@/lib/games";
 import { getCurrentUser } from "@/lib/session";
+import { HOST_DRIVEN_GAMES } from "@/games/registry";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import HostControlPanel from "@/components/HostControlPanel";
+import KaraokeHostPanel from "@/components/KaraokeHostPanel";
 import Wordmark from "@/components/Wordmark";
 
-// Live host control during a running Quiz Round game. Authorization is enforced
-// by the reducer (state.hostId === actorId for host events) — the page only
+// Live host control during a host-driven game (Quiz Round, Karaoke Queue,
+// future host-driven types). Authorization is enforced by each GameType's
+// reducer (state.hostId === actorId for host events) — this page only
 // guards rendering as a UX courtesy.
 export default async function SessionHostPage({
   params,
@@ -24,7 +28,7 @@ export default async function SessionHostPage({
 
   const game = await getActiveGame(id);
 
-  if (!game || game.type !== "quiz-round") {
+  if (!game || !HOST_DRIVEN_GAMES.has(game.type)) {
     return (
       <main className="min-h-dvh flex flex-col">
         <header className="flex items-center justify-between p-6">
@@ -39,17 +43,19 @@ export default async function SessionHostPage({
         </header>
         <section className="flex-1 px-6 max-w-3xl w-full mx-auto pb-12 flex items-center justify-center">
           <p className="font-body text-ink/60 text-center">
-            No active Quiz Round game in this session.
+            No host-driven game active in this session.
           </p>
         </section>
       </main>
     );
   }
 
-  const state = (await getGameState(game)) as QuizRoundState;
-  const players = await listPlayers(id);
+  // Per-game-type state extraction. The hostId check is uniform (all host-
+  // driven game states carry hostId at the top level by convention).
+  const rawState = await getGameState(game);
+  const stateHostId = (rawState as { hostId?: string | null } | null)?.hostId ?? null;
 
-  if (state.hostId && state.hostId !== user.id) {
+  if (stateHostId && stateHostId !== user.id) {
     return (
       <main className="min-h-dvh flex flex-col">
         <header className="flex items-center justify-between p-6">
@@ -63,6 +69,8 @@ export default async function SessionHostPage({
       </main>
     );
   }
+
+  const players = await listPlayers(id);
 
   return (
     <main className="min-h-dvh flex flex-col">
@@ -87,12 +95,22 @@ export default async function SessionHostPage({
         </div>
       </header>
       <section className="flex-1 px-6 max-w-3xl w-full mx-auto py-6">
-        <HostControlPanel
-          sessionId={id}
-          gameId={game.id}
-          initialState={state}
-          initialPlayers={players}
-        />
+        {game.type === "quiz-round" && (
+          <HostControlPanel
+            sessionId={id}
+            gameId={game.id}
+            initialState={rawState as QuizRoundState}
+            initialPlayers={players}
+          />
+        )}
+        {game.type === "karaoke-queue" && (
+          <KaraokeHostPanel
+            sessionId={id}
+            gameId={game.id}
+            initialState={rawState as KaraokeQueueState}
+            initialPlayers={players}
+          />
+        )}
       </section>
     </main>
   );

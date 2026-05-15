@@ -40,6 +40,26 @@ What's playable today and how to add a new game.
 - **Note:** Host control surfaces at `/session/[id]/host`. The reducer enforces `state.hostId === actorId` for `quiz_round_open_question`, `quiz_round_close_question`, `quiz_round_advance`, and `quiz_round_end` — non-host players' attempts are rejected at the validate step. Server computes `elapsedMs` for answers from `state.questionOpenedAt` rather than trusting client-supplied timing.
 - **Question types:** Pluggable. v1 ships `multiple-choice` and `true-false`. Each type is a folder under `src/games/quiz-round/question-types/<type>/` with pure `validateAnswer` / `isCorrect` / `scoreAnswer`. Adding a new type is one folder + one line in the question-type registry; player and big-screen renderers dispatch on `question.type`.
 
+### Karaoke Queue
+- **Type key:** `karaoke-queue`
+- **Folder:** `src/games/karaoke-queue/`
+- **Mechanic:** First non-competitive game type. Players submit a song title (free text, one active per user); host arranges, edits, completes, or deletes from the queue at `/session/[id]/host`; big-screen displays "now up" + "up next" + a "recently performed" strip.
+- **Scoring:** None. `score()` returns `{}` — `finalizeGame()` becomes a no-op for this game type, so it doesn't pollute `session_players.score` or the persistent leaderboards.
+- **State shape:** `KaraokeQueueState` — `queue` / `completed` / `removed` lists of `KaraokeRequest { id, playerId, songTitle, submittedAt }`, plus `started` / `ended` flags and `hostId`.
+- **Seed events:** `karaoke_start` carries the host id; emitted via `onStart()` from `seedData` passed by the admin server action (no content package needed).
+- **Note:** "One active request per user" is enforced both in `validate` (so the API rejects with a clear reason) and in the reducer (so replay stays correct under any hypothetical client races). Reorder is non-destructive — unknown ids are dropped, missing ids are appended, so the host can't accidentally lose items.
+
+## Host-driven games
+
+Two of the five game types — Quiz Round and Karaoke Queue — are *host-driven*: a designated user (typically the staff member or patron running the game) controls flow at runtime. The pattern generalizes:
+
+- The admin server action passes `{ hostId: user.id }` via `seedData` when starting one of these games (registry exports `HOST_DRIVEN_GAMES` so admin can do this generically).
+- The GameType's `onStart` reads `seedData.hostId` and emits a seed event that captures it into state.
+- The reducer enforces `state.hostId === actorId` for any host-only event in its `validate` step.
+- Admin shows a "Host control →" button to `/session/[id]/host` when a host-driven game is running. That route dispatches by `game.type` to the right control panel component.
+
+Adding a new host-driven game = the GameType reads `seedData.hostId` in `onStart` + the host route adds a render branch for the new type.
+
 ## Big-screen + leaderboard integration
 
 Every game gets the same projector treatment for free:

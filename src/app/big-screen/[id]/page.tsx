@@ -7,7 +7,9 @@ import AttendeeList from "@/components/AttendeeList";
 import Leaderboard from "@/components/Leaderboard";
 import SessionRecap from "@/components/SessionRecap";
 import QuizRoundBigScreen from "@/components/QuizRoundBigScreen";
+import KaraokeQueueBigScreen from "@/components/KaraokeQueueBigScreen";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 
 // Big-screen / projector view. Public, no auth. Inverted REALITY palette
 // (ink ground + cream + a chromatic accent) for high contrast on the projector.
@@ -54,10 +56,12 @@ export default async function BigScreenPage({
     scores,
   };
 
-  // Quiz Round takes over the whole stage — question display + reveal +
-  // inter-question leaderboard. Other game types keep the existing QR-plus-
-  // sidebar layout.
-  if (game?.type === "quiz-round") {
+  // Game types that take over the whole projector. Other game types keep
+  // the QR-plus-sidebar layout below.
+  const fullScreenGame =
+    game?.type === "quiz-round" || game?.type === "karaoke-queue";
+
+  if (fullScreenGame) {
     return (
       <main className="min-h-dvh bg-ink text-cream flex flex-col">
         <header className="flex items-center justify-between px-10 pt-8">
@@ -83,14 +87,25 @@ export default async function BigScreenPage({
             </p>
           </div>
         </header>
-        <QuizRoundBigScreen
-          sessionId={session.id}
-          initial={{
-            gameState: gameState as QuizRoundState | null,
-            players,
-            scores,
-          }}
-        />
+        {game?.type === "quiz-round" && (
+          <QuizRoundBigScreen
+            sessionId={session.id}
+            initial={{
+              gameState: gameState as QuizRoundState | null,
+              players,
+              scores,
+            }}
+          />
+        )}
+        {game?.type === "karaoke-queue" && (
+          <KaraokeQueueBigScreen
+            sessionId={session.id}
+            initial={{
+              gameState: gameState as KaraokeQueueState | null,
+              players,
+            }}
+          />
+        )}
         <footer className="px-10 pb-6 text-center font-body text-xs text-cream/50">
           86 Mai Thúc Lân, Đà Nẵng · realitydn.com
         </footer>
