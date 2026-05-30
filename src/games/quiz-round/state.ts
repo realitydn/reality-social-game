@@ -15,6 +15,10 @@ export type QuizRoundConfig = {
   speedBonus: boolean;
   /** Default points per question if not overridden per-question. */
   defaultPoints: number;
+  /** Team play: players join teams and the projector shows team standings
+   *  (a team's score = the sum of its members' scores). Individual scoring and
+   *  the per-player leaderboards are unchanged. */
+  teamsEnabled?: boolean;
 };
 
 export const DEFAULT_QUIZ_ROUND_CONFIG: QuizRoundConfig = {
@@ -23,6 +27,7 @@ export const DEFAULT_QUIZ_ROUND_CONFIG: QuizRoundConfig = {
   interQuestionLeaderboard: true,
   speedBonus: true,
   defaultPoints: 1000,
+  teamsEnabled: false,
 };
 
 export type QuizRoundQuestion = {
@@ -47,6 +52,8 @@ export type QuizRoundAnswer = {
   submittedAt: number;
 };
 
+export type QuizTeam = { id: string; name: string };
+
 export type QuizRoundState = {
   started: boolean;
   /** Who started the game; the only user authorized to push host events. */
@@ -62,6 +69,10 @@ export type QuizRoundState = {
   /** Submitted answers: questionIdx → { playerId → answer }. First answer wins. */
   answers: Record<number, Record<string, QuizRoundAnswer>>;
   scores: Record<string, number>;
+  /** Team play (config.teamsEnabled). teams[teamId] = {id,name}; playerTeam maps
+   *  a player to their team. A team's standing is the sum of members' scores. */
+  teams: Record<string, QuizTeam>;
+  playerTeam: Record<string, string>;
   /** Reveal log: per question, the question's data + per-player score deltas. */
   reveals: Record<number, { questionData: unknown; deltas: Record<string, number> }>;
 };
@@ -76,6 +87,8 @@ export const EMPTY_QUIZ_ROUND_STATE: QuizRoundState = {
   questionOpenedAt: null,
   answers: {},
   scores: {},
+  teams: {},
+  playerTeam: {},
   reveals: {},
 };
 
@@ -98,4 +111,28 @@ export type QuizRoundEvent =
     }
   | { kind: "quiz_round_close_question"; questionIdx: number; at: number }
   | { kind: "quiz_round_advance"; nextIdx: number; at: number }
-  | { kind: "quiz_round_end"; at: number };
+  | { kind: "quiz_round_end"; at: number }
+  | { kind: "quiz_create_team"; teamId: string; name: string; createdBy: string; at: number }
+  | { kind: "quiz_join_team"; playerId: string; teamId: string; at: number };
+
+export type TeamStanding = { teamId: string; name: string; score: number; members: number };
+
+// Pure: derive team standings from per-player scores + team membership. Used by
+// the player view, projector, and host panel. Sorted highest-first.
+export function teamStandings(state: QuizRoundState): TeamStanding[] {
+  const agg: Record<string, { score: number; members: number }> = {};
+  for (const teamId of Object.keys(state.teams)) agg[teamId] = { score: 0, members: 0 };
+  for (const [playerId, teamId] of Object.entries(state.playerTeam)) {
+    if (!agg[teamId]) continue;
+    agg[teamId].members += 1;
+    agg[teamId].score += state.scores[playerId] ?? 0;
+  }
+  return Object.values(state.teams)
+    .map((team) => ({
+      teamId: team.id,
+      name: team.name,
+      score: agg[team.id]?.score ?? 0,
+      members: agg[team.id]?.members ?? 0,
+    }))
+    .sort((a, b) => b.score - a.score);
+}

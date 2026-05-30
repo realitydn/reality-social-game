@@ -43,6 +43,8 @@ const EventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("quiz_round_close_question") }),
   z.object({ kind: z.literal("quiz_round_advance"), nextIdx: idx }),
   z.object({ kind: z.literal("quiz_round_end") }),
+  z.object({ kind: z.literal("quiz_create_team"), name: str(40) }),
+  z.object({ kind: z.literal("quiz_join_team"), teamId: str(64) }),
   // Karaoke Queue
   z.object({ kind: z.literal("karaoke_submit"), songTitle: str(200) }),
   z.object({ kind: z.literal("karaoke_edit"), requestId: str(64), songTitle: str(200) }),
@@ -373,6 +375,52 @@ export async function POST(
       },
     });
     await notifySession(game.session_id, "quiz_round_answer");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "quiz_create_team") {
+    const state = (await getGameState(game)) as QuizRoundState;
+    const teamId = crypto.randomUUID();
+    const event: QuizRoundEvent = {
+      kind: "quiz_create_team",
+      teamId,
+      name: body.name,
+      createdBy: user.id,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_create_team",
+      actorId: user.id,
+      targetId: null,
+      payload: { teamId, name: body.name, createdBy: user.id, at: now },
+    });
+    await notifySession(game.session_id, "quiz_create_team");
+    return NextResponse.json({ ok: true, teamId });
+  }
+
+  if (body.kind === "quiz_join_team") {
+    const state = (await getGameState(game)) as QuizRoundState;
+    const event: QuizRoundEvent = {
+      kind: "quiz_join_team",
+      playerId: user.id,
+      teamId: body.teamId,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_join_team",
+      actorId: user.id,
+      targetId: null,
+      payload: { playerId: user.id, teamId: body.teamId, at: now },
+    });
+    await notifySession(game.session_id, "quiz_join_team");
     return NextResponse.json({ ok: true });
   }
 

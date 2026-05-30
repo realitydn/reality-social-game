@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { QuizRoundState, TeamStanding } from "@/games/quiz-round/state";
+import { teamStandings } from "@/games/quiz-round/state";
 import { QuizRoundGame } from "@/games/quiz-round";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { MCQData } from "@/games/quiz-round/question-types/multiple-choice";
@@ -61,7 +62,14 @@ export default function QuizRoundBigScreen({ sessionId, initial, locale = "en" }
   if (!state) return null;
 
   if (state.phase === "ended") {
-    return <FinalPodium players={data.players} scores={data.scores} labels={labels} />;
+    return (
+      <FinalPodium
+        state={state}
+        players={data.players}
+        scores={data.scores}
+        labels={labels}
+      />
+    );
   }
 
   if (state.phase === "lobby" || state.currentIdx === null) {
@@ -147,9 +155,12 @@ export default function QuizRoundBigScreen({ sessionId, initial, locale = "en" }
         />
       )}
 
-      {showInterLeaderboard && (
-        <InterLeaderboard players={data.players} scores={state.scores} labels={labels} />
-      )}
+      {showInterLeaderboard &&
+        (state.config.teamsEnabled ? (
+          <TeamLeaderboard standings={teamStandings(state)} labels={labels} />
+        ) : (
+          <InterLeaderboard players={data.players} scores={state.scores} labels={labels} />
+        ))}
     </div>
   );
 }
@@ -549,15 +560,59 @@ function InterLeaderboard({
   );
 }
 
+// Inter-question leaderboard, team variant (config.teamsEnabled). A team's
+// score is the sum of its members' individual scores — see teamStandings.
+function TeamLeaderboard({
+  standings,
+  labels,
+}: {
+  standings: TeamStanding[];
+  labels: Labels;
+}) {
+  const ranked = standings.filter((s) => s.score > 0).slice(0, 5);
+  if (ranked.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p
+        className="font-display font-semibold text-sm uppercase text-cream/60"
+        style={{ letterSpacing: "0.05em" }}
+      >
+        {labels.teamLeaderboard}
+      </p>
+      {ranked.map((t, i) => (
+        <div
+          key={t.teamId}
+          className={`flex items-center justify-between gap-4 p-2 ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
+        >
+          <span
+            className="font-display font-bold text-2xl uppercase line-clamp-2"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            {i + 1}. {t.name}
+          </span>
+          <span className="font-display font-bold text-2xl tabular-nums shrink-0">{t.score}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FinalPodium({
+  state,
   players,
   scores,
   labels,
 }: {
+  state: QuizRoundState;
   players: SessionPlayer[];
   scores: Record<string, number>;
   labels: Labels;
 }) {
+  if (state.config.teamsEnabled) {
+    return <TeamPodium standings={teamStandings(state)} labels={labels} />;
+  }
+
   const ranked = players
     .map((p) => ({ player: p, score: scores[p.user_id] ?? 0 }))
     .sort((a, b) => b.score - a.score)
@@ -586,6 +641,52 @@ function FinalPodium({
             <span className="font-display font-bold text-3xl tabular-nums shrink-0">{r.score}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Final podium, team variant. Biggest team first; the winning team gets the
+// outsized treatment so the room can read the result at a glance.
+function TeamPodium({
+  standings,
+  labels,
+}: {
+  standings: TeamStanding[];
+  labels: Labels;
+}) {
+  const ranked = standings.slice(0, 5);
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-12 gap-6">
+      <p
+        className="font-display font-bold text-6xl uppercase text-yellow"
+        style={{ letterSpacing: "0.05em" }}
+      >
+        {labels.roundComplete}
+      </p>
+      <div className="flex flex-col gap-3 w-full max-w-2xl">
+        {ranked.map((t, i) => {
+          const top = i === 0;
+          return (
+            <div
+              key={t.teamId}
+              className={`flex items-center justify-between gap-4 ${top ? "p-6" : "p-4"} ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
+            >
+              <span
+                className={`font-display font-bold uppercase line-clamp-2 ${top ? "text-5xl" : "text-3xl"}`}
+                style={{ letterSpacing: "0.05em" }}
+              >
+                {i + 1}. {t.name}
+              </span>
+              <span
+                className={`font-display font-bold tabular-nums shrink-0 ${top ? "text-5xl" : "text-3xl"}`}
+              >
+                {t.score}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

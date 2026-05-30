@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { QuizRoundState, QuizRoundAnswer } from "@/games/quiz-round/state";
+import { teamStandings } from "@/games/quiz-round/state";
 import type { MCQData } from "@/games/quiz-round/question-types/multiple-choice";
 import type { TFData } from "@/games/quiz-round/question-types/true-false";
 import type { FreeTextData } from "@/games/quiz-round/question-types/free-text";
@@ -14,9 +15,18 @@ type Props = {
   meId: string;
   labels: Record<string, string>;
   onAnswer: (value: unknown) => Promise<{ ok: boolean; error?: string }>;
+  onCreateTeam: (name: string) => Promise<{ ok: boolean; error?: string }>;
+  onJoinTeam: (teamId: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
-export default function QuizRoundView({ state, meId, labels, onAnswer }: Props) {
+export default function QuizRoundView({
+  state,
+  meId,
+  labels,
+  onAnswer,
+  onCreateTeam,
+  onJoinTeam,
+}: Props) {
   if (!state.started) {
     return (
       <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
@@ -53,8 +63,19 @@ export default function QuizRoundView({ state, meId, labels, onAnswer }: Props) 
 
   if (state.phase === "lobby" || state.currentIdx === null) {
     return (
-      <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
-        {labels.questionPending}
+      <div className="flex flex-col gap-4">
+        {state.config.teamsEnabled && (
+          <TeamSection
+            state={state}
+            meId={meId}
+            labels={labels}
+            onCreateTeam={onCreateTeam}
+            onJoinTeam={onJoinTeam}
+          />
+        )}
+        <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
+          {labels.questionPending}
+        </div>
       </div>
     );
   }
@@ -67,6 +88,15 @@ export default function QuizRoundView({ state, meId, labels, onAnswer }: Props) 
 
   return (
     <div className="flex flex-col gap-4">
+      {state.config.teamsEnabled && (
+        <TeamSection
+          state={state}
+          meId={meId}
+          labels={labels}
+          onCreateTeam={onCreateTeam}
+          onJoinTeam={onJoinTeam}
+        />
+      )}
       <p
         className="font-display font-semibold text-xs uppercase text-ink/60"
         style={{ letterSpacing: "0.05em" }}
@@ -169,6 +199,144 @@ export default function QuizRoundView({ state, meId, labels, onAnswer }: Props) 
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// Team play (config.teamsEnabled). Shown above the question UI: lets a player
+// without a team join an existing one or spin up a new one, and shows a player
+// already on a team their team's live rank + score. Individual scoring and the
+// per-player answer flow are untouched; this is purely additive chrome.
+function TeamSection({
+  state,
+  meId,
+  labels,
+  onCreateTeam,
+  onJoinTeam,
+}: {
+  state: QuizRoundState;
+  meId: string;
+  labels: Record<string, string>;
+  onCreateTeam: (name: string) => Promise<{ ok: boolean; error?: string }>;
+  onJoinTeam: (teamId: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const myTeamId = state.playerTeam[meId];
+
+  // Player already on a team: surface their live standing.
+  if (myTeamId) {
+    const standings = teamStandings(state);
+    const rank = standings.findIndex((s) => s.teamId === myTeamId);
+    const mine = rank >= 0 ? standings[rank] : null;
+    const teamName = mine?.name ?? state.teams[myTeamId]?.name ?? "";
+    return (
+      <div className="border-2 border-ink p-4 flex flex-col gap-3">
+        <div>
+          <p
+            className="font-display font-semibold text-xs uppercase text-ink/60"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            {labels.yourTeam}
+          </p>
+          <p
+            className="font-display font-bold text-2xl uppercase line-clamp-2"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            {teamName}
+          </p>
+        </div>
+        {mine && (
+          <div className="bg-ink text-cream p-3 flex items-center justify-between">
+            <span
+              className="font-display font-semibold text-xs uppercase text-cream/70"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {labels.teamRank} #{rank + 1}
+            </span>
+            <span className="font-display font-bold text-3xl tabular-nums">{mine.score}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const teams = Object.values(state.teams);
+
+  const join = async (teamId: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const r = await onJoinTeam(teamId);
+    setBusy(false);
+    if (!r.ok) setError(r.error ?? "Could not join");
+  };
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    const r = await onCreateTeam(name.trim());
+    setBusy(false);
+    if (r.ok) setName("");
+    else setError(r.error ?? "Could not create");
+  };
+
+  return (
+    <div className="border-2 border-ink p-4 flex flex-col gap-3">
+      <p
+        className="font-display font-bold text-lg uppercase"
+        style={{ letterSpacing: "0.05em" }}
+      >
+        {labels.teamsHeading}
+      </p>
+
+      {teams.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {teams.map((t) => (
+            <div
+              key={t.id}
+              className="border-2 border-ink/30 p-2 flex items-center justify-between gap-3"
+            >
+              <span className="font-body flex-1 line-clamp-2">{t.name}</span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => join(t.id)}
+                className="bg-ink text-cream font-display font-bold text-xs uppercase px-4 py-2 shrink-0 disabled:opacity-50"
+                style={{ letterSpacing: "0.05em" }}
+              >
+                {labels.join}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={create} className="flex gap-2">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={busy}
+          placeholder={labels.teamNamePlaceholder}
+          maxLength={40}
+          className="border-2 border-ink px-3 py-2 font-body text-base flex-1 min-w-0"
+        />
+        <button
+          type="submit"
+          disabled={!name.trim() || busy}
+          className="bg-yellow text-ink font-display font-bold uppercase px-5 py-2 shrink-0 disabled:opacity-50"
+          style={{ letterSpacing: "0.05em" }}
+        >
+          {labels.create}
+        </button>
+      </form>
+
+      {error && <p className="font-body text-red text-sm">{error}</p>}
     </div>
   );
 }

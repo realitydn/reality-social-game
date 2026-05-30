@@ -43,6 +43,16 @@ const QR_LABELS: Record<Locale, Record<string, string>> = {
     correctOrder: "Correct order:",
     nowPlaying: "Playing…",
     tapPlay: "Tap play",
+    // Teams
+    teamsHeading: "Join a team",
+    joinTeam: "Join a team",
+    createTeam: "Create a team",
+    teamNamePlaceholder: "Team name",
+    yourTeam: "Your team",
+    create: "Create",
+    join: "Join",
+    teamRank: "Rank",
+    teamLeaderboard: "Team standings",
   },
   vi: {
     title: "Vòng Đố Vui",
@@ -77,6 +87,16 @@ const QR_LABELS: Record<Locale, Record<string, string>> = {
     correctOrder: "Thứ tự đúng:",
     nowPlaying: "Đang phát…",
     tapPlay: "Nhấn phát",
+    // Teams
+    teamsHeading: "Tham gia đội",
+    joinTeam: "Tham gia đội",
+    createTeam: "Tạo đội",
+    teamNamePlaceholder: "Tên đội",
+    yourTeam: "Đội của bạn",
+    create: "Tạo",
+    join: "Tham gia",
+    teamRank: "Hạng",
+    teamLeaderboard: "Xếp hạng đội",
   },
   ru: {
     title: "Викторина",
@@ -111,6 +131,16 @@ const QR_LABELS: Record<Locale, Record<string, string>> = {
     correctOrder: "Правильный порядок:",
     nowPlaying: "Играет…",
     tapPlay: "Нажмите play",
+    // Teams
+    teamsHeading: "Вступить в команду",
+    joinTeam: "Вступить в команду",
+    createTeam: "Создать команду",
+    teamNamePlaceholder: "Название команды",
+    yourTeam: "Ваша команда",
+    create: "Создать",
+    join: "Вступить",
+    teamRank: "Место",
+    teamLeaderboard: "Зачёт команд",
   },
   uk: {
     title: "Вікторина",
@@ -145,6 +175,16 @@ const QR_LABELS: Record<Locale, Record<string, string>> = {
     correctOrder: "Правильний порядок:",
     nowPlaying: "Грає…",
     tapPlay: "Натисніть play",
+    // Teams
+    teamsHeading: "Приєднатися до команди",
+    joinTeam: "Приєднатися до команди",
+    createTeam: "Створити команду",
+    teamNamePlaceholder: "Назва команди",
+    yourTeam: "Ваша команда",
+    create: "Створити",
+    join: "Приєднатися",
+    teamRank: "Місце",
+    teamLeaderboard: "Залік команд",
   },
 };
 
@@ -190,6 +230,21 @@ export const QuizRoundGame: GameType<QuizRoundState, QuizRoundEvent> = {
         if (event.playerId !== actorId) return { ok: false, reason: "actor mismatch" };
         const existing = state.answers[event.questionIdx]?.[event.playerId];
         if (existing) return { ok: false, reason: "already answered" };
+        return { ok: true };
+      }
+
+      case "quiz_create_team": {
+        if (!state.config.teamsEnabled) return { ok: false, reason: "teams not enabled" };
+        if (!state.started || state.phase === "ended") return { ok: false, reason: "not active" };
+        if (event.createdBy !== actorId) return { ok: false, reason: "actor mismatch" };
+        if (!event.name?.trim()) return { ok: false, reason: "team name required" };
+        return { ok: true };
+      }
+
+      case "quiz_join_team": {
+        if (!state.config.teamsEnabled) return { ok: false, reason: "teams not enabled" };
+        if (!state.started || state.phase === "ended") return { ok: false, reason: "not active" };
+        if (event.playerId !== actorId) return { ok: false, reason: "actor mismatch" };
         return { ok: true };
       }
     }

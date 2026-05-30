@@ -134,6 +134,16 @@ export default function GameView({
     [postEvent],
   );
 
+  const handleQuizCreateTeam = useCallback(
+    (name: string) => postEvent({ kind: "quiz_create_team", name }),
+    [postEvent],
+  );
+
+  const handleQuizJoinTeam = useCallback(
+    (teamId: string) => postEvent({ kind: "quiz_join_team", teamId }),
+    [postEvent],
+  );
+
   const handleKaraokeSubmit = useCallback(
     (songTitle: string) => postEvent({ kind: "karaoke_submit", songTitle }),
     [postEvent],
@@ -224,6 +234,8 @@ export default function GameView({
         meId={data.me.user_id}
         labels={quizRoundLabels}
         onAnswer={handleQuizAnswer}
+        onCreateTeam={handleQuizCreateTeam}
+        onJoinTeam={handleQuizJoinTeam}
       />
     );
   }

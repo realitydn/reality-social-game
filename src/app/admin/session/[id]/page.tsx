@@ -94,6 +94,7 @@ export default async function AdminSessionPage({
     const seedConfig: QuizRoundConfig = {
       ...DEFAULT_QUIZ_ROUND_CONFIG,
       ...(pkg.config as Partial<QuizRoundConfig>),
+      teamsEnabled: formData.get("teamsEnabled") === "on",
     };
     const questions =
       ((pkg.content as { questions?: QuizRoundQuestion[] }).questions) ?? [];
@@ -356,6 +357,10 @@ export default async function AdminSessionPage({
                   ))}
                 </select>
                 <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
+                <label className="flex items-center gap-1 font-body text-xs text-ink/60 self-center">
+                  <input type="checkbox" name="teamsEnabled" className="w-4 h-4 accent-ink" />
+                  Teams
+                </label>
                 {game ? (
                   <ConfirmSubmitButton
                     disabled={quizPackages.length === 0}

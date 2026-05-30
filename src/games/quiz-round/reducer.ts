@@ -123,6 +123,29 @@ export function reduceQuizRound(state: QuizRoundState, event: QuizRoundEvent): Q
     case "quiz_round_end": {
       return { ...state, phase: "ended" };
     }
+
+    case "quiz_create_team": {
+      if (!state.started || !state.config.teamsEnabled || state.phase === "ended") return state;
+      if (state.teams[event.teamId]) return state; // already exists
+      if (Object.keys(state.teams).length >= 32) return state; // sane cap
+      const name = event.name.trim().slice(0, 40);
+      if (!name) return state;
+      return {
+        ...state,
+        teams: { ...state.teams, [event.teamId]: { id: event.teamId, name } },
+        // The creator auto-joins their new team.
+        playerTeam: { ...state.playerTeam, [event.createdBy]: event.teamId },
+      };
+    }
+
+    case "quiz_join_team": {
+      if (!state.started || !state.config.teamsEnabled || state.phase === "ended") return state;
+      if (!state.teams[event.teamId]) return state; // team must exist
+      return {
+        ...state,
+        playerTeam: { ...state.playerTeam, [event.playerId]: event.teamId },
+      };
+    }
   }
 }
 
