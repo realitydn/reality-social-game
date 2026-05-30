@@ -24,6 +24,7 @@ import {
 import type { DisposableCameraSeed } from "@/games/disposable-camera";
 import { getBaseUrl } from "@/lib/url";
 import AttendeeList from "@/components/AttendeeList";
+import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import Wordmark from "@/components/Wordmark";
 
 export default async function AdminSessionPage({
@@ -169,13 +170,15 @@ export default async function AdminSessionPage({
           )}
           {!session.ends_at && (
             <form action={end}>
-              <button
-                type="submit"
+              <ConfirmSubmitButton
                 className="border-2 border-red text-red font-display font-bold uppercase px-5 py-2 transition hover:bg-red hover:text-cream"
                 style={{ letterSpacing: "0.05em" }}
+                title="End session?"
+                body="Ends the night for everyone and flips the big screen to the recap. Can't be undone."
+                confirmLabel="End session"
               >
                 End session
-              </button>
+              </ConfirmSubmitButton>
             </form>
           )}
         </div>
@@ -201,16 +204,28 @@ export default async function AdminSessionPage({
                 ).map((g) => (
                   <form key={g.key} action={startSimpleGame}>
                     <input type="hidden" name="type" value={g.key} />
-                    <button
-                      type="submit"
-                      className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
-                      style={{
-                        letterSpacing: "0.05em",
-                        boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
-                      }}
-                    >
-                      {game ? `Switch to ${g.label}` : `Start ${g.label}`}
-                    </button>
+                    {game ? (
+                      <ConfirmSubmitButton
+                        className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                        style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+                        title="Switch game?"
+                        body={`This ends the current game (scores are saved) and starts ${g.label}.`}
+                        confirmLabel={`Switch to ${g.label}`}
+                      >
+                        {`Switch to ${g.label}`}
+                      </ConfirmSubmitButton>
+                    ) : (
+                      <button
+                        type="submit"
+                        className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                        style={{
+                          letterSpacing: "0.05em",
+                          boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
+                        }}
+                      >
+                        {`Start ${g.label}`}
+                      </button>
+                    )}
                   </form>
                 ))}
               </div>
@@ -261,16 +276,28 @@ export default async function AdminSessionPage({
                     className="border-2 border-ink px-1 py-0.5 w-16 font-body text-sm"
                   />
                 </label>
-                <button
-                  type="submit"
-                  className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
-                  style={{
-                    letterSpacing: "0.05em",
-                    boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
-                  }}
-                >
-                  {game ? "Switch to Disposable Camera" : "Start Disposable Camera"}
-                </button>
+                {game ? (
+                  <ConfirmSubmitButton
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                    style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+                    title="Switch game?"
+                    body="This ends the current game (scores saved) and starts Disposable Camera."
+                    confirmLabel="Switch"
+                  >
+                    Switch to Disposable Camera
+                  </ConfirmSubmitButton>
+                ) : (
+                  <button
+                    type="submit"
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                    style={{
+                      letterSpacing: "0.05em",
+                      boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
+                    }}
+                  >
+                    Start Disposable Camera
+                  </button>
+                )}
               </form>
             )}
 
@@ -301,17 +328,30 @@ export default async function AdminSessionPage({
                     </option>
                   ))}
                 </select>
-                <button
-                  type="submit"
-                  disabled={quizPackages.length === 0}
-                  className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5 disabled:opacity-50"
-                  style={{
-                    letterSpacing: "0.05em",
-                    boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
-                  }}
-                >
-                  {game ? "Switch to Quiz Round" : "Start Quiz Round"}
-                </button>
+                {game ? (
+                  <ConfirmSubmitButton
+                    disabled={quizPackages.length === 0}
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5 disabled:opacity-50"
+                    style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+                    title="Switch game?"
+                    body="This ends the current game (scores saved) and starts the Quiz Round."
+                    confirmLabel="Switch"
+                  >
+                    Switch to Quiz Round
+                  </ConfirmSubmitButton>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={quizPackages.length === 0}
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5 disabled:opacity-50"
+                    style={{
+                      letterSpacing: "0.05em",
+                      boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
+                    }}
+                  >
+                    Start Quiz Round
+                  </button>
+                )}
                 <Link
                   href="/host"
                   className="font-display font-semibold text-xs uppercase text-ink/60 hover:text-ink self-center px-1"
@@ -324,13 +364,15 @@ export default async function AdminSessionPage({
 
             {game && (
               <form action={endActiveGame}>
-                <button
-                  type="submit"
+                <ConfirmSubmitButton
                   className="border-2 border-red text-red font-display font-bold uppercase px-4 py-2 transition hover:bg-red hover:text-cream"
                   style={{ letterSpacing: "0.05em" }}
+                  title="End game?"
+                  body="Finalizes scores and stops the current game."
+                  confirmLabel="End game"
                 >
                   End game
-                </button>
+                </ConfirmSubmitButton>
               </form>
             )}
           </div>

@@ -197,7 +197,7 @@ export default async function PlayerSessionPage({
           </div>
         )}
 
-        <div className="mb-10">
+        <div className="mb-6">
           <GameView
             sessionId={session.id}
             initial={initialDashboard}
@@ -211,6 +211,14 @@ export default async function PlayerSessionPage({
             noActiveGameMessage={t("noActiveGame")}
           />
         </div>
+
+        <Link
+          href="/leaderboard"
+          className="block text-center font-display font-semibold text-xs uppercase text-ink/50 hover:text-ink mb-10"
+          style={{ letterSpacing: "0.05em" }}
+        >
+          {t("seeLeaderboard")} →
+        </Link>
 
         <h2
           className="font-display font-semibold text-sm uppercase mb-4"

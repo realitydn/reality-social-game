@@ -52,6 +52,9 @@ export default function NewSessionPage() {
 }
 
 function defaultName(): string {
-  const d = new Date();
-  return `${d.toLocaleString("en-US", { weekday: "short" }).toUpperCase()} · ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getFullYear()).slice(-2)}`;
+  // Đà Nẵng time (UTC+7, no DST). Workers run in UTC, so shift then read UTC
+  // parts — otherwise a late-night session is labelled with the previous day.
+  const ict = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const wd = ict.toLocaleString("en-US", { weekday: "short", timeZone: "UTC" }).toUpperCase();
+  return `${wd} · ${String(ict.getUTCDate()).padStart(2, "0")}.${String(ict.getUTCMonth() + 1).padStart(2, "0")}.${String(ict.getUTCFullYear()).slice(-2)}`;
 }

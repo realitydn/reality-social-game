@@ -1,7 +1,11 @@
 {
   "home": {
     "title": "Find someone in the room.",
-    "tagline": "A party game played in person at REALITY. Pick a game, find a player, score points."
+    "tagline": "A party game played in person at REALITY. Pick a game, find a player, score points.",
+    "signedInAs": "You're signed in as {name}.",
+    "joinHint": "Scan the QR at REALITY to join tonight's game.",
+    "profileCta": "Your profile",
+    "leaderboardCta": "Leaderboard"
   },
   "auth": {
     "google": "Sign in with Google",
