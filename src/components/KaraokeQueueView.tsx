@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import type { SessionPlayer } from "@/lib/sessions";
 
@@ -21,7 +21,28 @@ export default function KaraokeQueueView({
 }: Props) {
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const myRequest = state.queue.find((r) => r.playerId === meId);
+  const myPosition = myRequest
+    ? state.queue.findIndex((r) => r.playerId === meId) + 1
+    : null;
+  const imNext = myPosition !== null && myPosition <= 2;
+
+  // Once the request lands in shared state the card replaces the form, so the
+  // optimistic "Added ✓" flag has served its purpose — clear it. A timeout is a
+  // safety net in case the new state never arrives (so the button can't stay
+  // stuck on "Added ✓").
+  useEffect(() => {
+    if (!justAdded) return;
+    if (myRequest) {
+      setJustAdded(false);
+      return;
+    }
+    const t = setTimeout(() => setJustAdded(false), 4000);
+    return () => clearTimeout(t);
+  }, [justAdded, myRequest]);
 
   if (!state.started) {
     return (
@@ -38,22 +59,27 @@ export default function KaraokeQueueView({
     );
   }
 
-  const myRequest = state.queue.find((r) => r.playerId === meId);
-  const myPosition = myRequest
-    ? state.queue.findIndex((r) => r.playerId === meId) + 1
-    : null;
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || submitting) return;
+    if (!title.trim() || submitting || justAdded) return;
     setSubmitting(true);
     setError(null);
     const r = await onSubmit(title.trim());
     setSubmitting(false);
     if (!r.ok) {
-      setError(r.error ?? "Could not submit");
+      // Map the common "already in queue" server reason to the localized label
+      // instead of leaking raw English error text.
+      const reason = r.error ?? "";
+      setError(
+        /already have a request/i.test(reason)
+          ? labels.alreadyQueued
+          : reason || labels.alreadyQueued,
+      );
     } else {
+      // Optimistic confirmation: clear the input and hold a disabled "Added ✓"
+      // button until the new shared state (the request card) arrives.
       setTitle("");
+      setJustAdded(true);
     }
   }
 
@@ -61,7 +87,7 @@ export default function KaraokeQueueView({
     <div className="flex flex-col gap-6">
       {myRequest ? (
         <div
-          className="bg-teal text-ink p-6"
+          className={`${imNext ? "bg-yellow" : "bg-teal"} text-ink p-6`}
           style={{ boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
         >
           <p
@@ -76,6 +102,14 @@ export default function KaraokeQueueView({
           >
             {myRequest.songTitle}
           </p>
+          {imNext && (
+            <p
+              className="font-display font-bold text-base uppercase mt-2"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {labels.youreNext}
+            </p>
+          )}
           <p className="font-body text-sm mt-3">
             {labels.queuePosition}:{" "}
             <span className="font-display font-bold text-lg">{myPosition}</span>
@@ -101,11 +135,15 @@ export default function KaraokeQueueView({
           />
           <button
             type="submit"
-            disabled={!title.trim() || submitting}
+            disabled={(!title.trim() && !justAdded) || submitting || justAdded}
             className="bg-ink text-cream font-display font-bold uppercase px-6 py-3 disabled:opacity-50 transition hover:translate-y-0.5"
             style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
           >
-            {submitting ? "…" : labels.submitButton}
+            {justAdded
+              ? labels.addedConfirm
+              : submitting
+                ? labels.adding
+                : labels.submitButton}
           </button>
           {error && <p className="font-body text-red text-sm">{error}</p>}
         </form>
@@ -135,7 +173,7 @@ export default function KaraokeQueueView({
                   </span>
                   <span className="font-body truncate flex-1">{r.songTitle}</span>
                   <span className="font-body text-xs text-ink/60 truncate max-w-[40%]">
-                    {player?.display_name ?? "?"}
+                    {player?.display_name ?? labels.someone}
                   </span>
                 </li>
               );
@@ -164,7 +202,7 @@ export default function KaraokeQueueView({
                 >
                   <span className="truncate flex-1">{r.songTitle}</span>
                   <span className="truncate max-w-[40%]">
-                    {player?.display_name ?? "?"}
+                    {player?.display_name ?? labels.someone}
                   </span>
                 </li>
               );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   DisposableCameraState,
   DisposablePhoto,
@@ -8,6 +8,16 @@ import type {
 import { tallyVotes } from "@/games/disposable-camera/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import { resizeImage } from "@/lib/image-resize";
+import ConfirmModal from "@/components/ConfirmModal";
+
+// Fill {token} placeholders in a localized template. Tolerates missing keys
+// (falls back to the token name) so a half-translated locale never crashes.
+function fmt(template: string | undefined, vars: Record<string, string | number>): string {
+  if (!template) return "";
+  return template.replace(/\{(\w+)\}/g, (_, k: string) =>
+    k in vars ? String(vars[k]) : `{${k}}`,
+  );
+}
 
 type Props = {
   state: DisposableCameraState;
@@ -95,6 +105,8 @@ function CapturePhase({
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
   const eitherInputRef = useRef<HTMLInputElement>(null);
@@ -140,6 +152,15 @@ function CapturePhase({
   }
 
   const handlePick = (input: HTMLInputElement | null) => () => input?.click();
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const r = await onDeletePhoto(pendingDelete);
+    setDeleting(false);
+    if (!r.ok) setUploadError(r.error ?? "Could not delete photo");
+    setPendingDelete(null);
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -242,7 +263,7 @@ function CapturePhase({
             className="border-2 border-ink text-ink font-display font-bold uppercase px-5 py-3 transition hover:bg-yellow disabled:opacity-50"
             style={{ letterSpacing: "0.05em" }}
           >
-            {uploading ? "…" : "From library"}
+            {uploading ? "…" : labels.captureGeneric}
           </button>
         </div>
       )}
@@ -257,7 +278,7 @@ function CapturePhase({
             className="font-display font-semibold text-xs uppercase text-ink/60 mb-2"
             style={{ letterSpacing: "0.05em" }}
           >
-            Your shots
+            {labels.yourShots}
           </p>
           <div className="grid grid-cols-3 gap-2">
             {myPhotos.map((p) => (
@@ -268,13 +289,18 @@ function CapturePhase({
                   alt=""
                   className="w-full h-full object-cover"
                 />
+                {/* ≥44px hit target in the corner; the visible chip stays small
+                    but the tap area is comfortable, and a confirm guards the
+                    delete so a stray tap can't wipe a shot. */}
                 <button
                   type="button"
-                  onClick={() => void onDeletePhoto(p.id)}
-                  className="absolute top-1 right-1 bg-red text-cream w-6 h-6 font-display font-bold text-sm"
+                  onClick={() => setPendingDelete(p.id)}
+                  className="absolute top-0 right-0 w-11 h-11 flex items-start justify-end p-1 group"
                   aria-label={labels.deletePhoto}
                 >
-                  ×
+                  <span className="bg-red text-cream w-7 h-7 flex items-center justify-center font-display font-bold text-base transition group-hover:scale-110">
+                    ×
+                  </span>
                 </button>
               </div>
             ))}
@@ -282,9 +308,27 @@ function CapturePhase({
         </div>
       )}
 
-      <p className="font-body text-xs text-ink/40 italic">
-        {labels.waitingForVoting}
-      </p>
+      {atLimit ? (
+        <div className="border-2 border-green bg-green/15 px-4 py-3 font-body text-base text-ink">
+          {labels.waitingForVoting}
+        </div>
+      ) : (
+        <div className="border-2 border-ink/20 px-4 py-3 font-body text-base text-ink/70">
+          {labels.votingOpensSoon}
+        </div>
+      )}
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title={labels.deletePhotoConfirmTitle}
+        body={labels.deletePhotoConfirmBody}
+        confirmLabel={labels.deletePhotoConfirm}
+        cancelLabel={labels.deletePhotoCancel}
+        tone="danger"
+        busy={deleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
@@ -304,9 +348,29 @@ function VotePhase({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const busyRef = useRef(false);
+  busyRef.current = busy;
 
-  const myBallot = state.votes[meId] ?? [];
+  const serverBallot = state.votes[meId] ?? [];
   const limit = state.config.votesPerPlayer;
+
+  // Optimistic ballot: reflects the tap immediately so the ✓ + count update
+  // before the server round-trips (the prior code only showed ✓ once the
+  // polled state echoed, which read as "nothing happened" and drove double
+  // taps). We reconcile to the server ballot whenever the *server* value
+  // actually changes (and we're not mid-flight), so host edits / cross-device
+  // state still win — but a successful own-vote doesn't flicker the ✓ off
+  // while the next poll catches up.
+  const [optimistic, setOptimistic] = useState<string[]>(serverBallot);
+  const serverKey = serverBallot.join(",");
+  useEffect(() => {
+    if (!busyRef.current) setOptimistic(serverBallot);
+    // Keyed on serverKey only: reconcile when the server ballot changes, not on
+    // every busy toggle (which would briefly revert a just-cast vote).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverKey]);
+
+  const myBallot = optimistic;
   const used = myBallot.length;
 
   const toggle = async (photoId: string) => {
@@ -327,11 +391,15 @@ function VotePhase({
       }
       next = [...myBallot, photoId];
     }
+    setOptimistic(next); // show ✓ + updated count right away
     setBusy(true);
     setError(null);
     const r = await onVote(next);
     setBusy(false);
-    if (!r.ok) setError(r.error ?? "Vote failed");
+    if (!r.ok) {
+      setError(r.error ?? "Vote failed");
+      setOptimistic(serverBallot); // roll back the optimistic toggle
+    }
   };
 
   const nameOf = (id: string) =>
@@ -354,7 +422,14 @@ function VotePhase({
         </span>
       </div>
       {error && <p className="font-body text-red text-sm">{error}</p>}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {/* While a vote is in flight the whole grid dims + stops accepting taps,
+          so the action visibly registers and double-taps don't queue. */}
+      <div
+        aria-busy={busy}
+        className={`grid grid-cols-2 sm:grid-cols-3 gap-2 transition-opacity ${
+          busy ? "opacity-50 pointer-events-none" : ""
+        }`}
+      >
         {state.photos.map((p) => {
           const voted = myBallot.includes(p.id);
           const isOwn = p.uploaderId === meId;
@@ -375,16 +450,16 @@ function VotePhase({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.url} alt="" className="w-full h-full object-cover" />
               {voted && (
-                <span className="absolute top-1 right-1 bg-yellow text-ink font-display font-bold text-sm w-6 h-6 flex items-center justify-center">
+                <span className="absolute top-1 right-1 bg-yellow text-ink font-display font-bold text-base w-7 h-7 flex items-center justify-center">
                   ✓
                 </span>
               )}
               {isOwn && (
-                <span className="absolute bottom-0 inset-x-0 bg-ink/80 text-cream text-[10px] py-0.5 font-display uppercase tracking-wider text-center">
-                  yours
+                <span className="absolute bottom-0 inset-x-0 bg-ink/80 text-cream text-xs py-0.5 font-display uppercase tracking-wider text-center">
+                  {labels.yoursTag}
                 </span>
               )}
-              <span className="absolute top-1 left-1 bg-ink/70 text-cream text-[10px] px-1 font-body truncate max-w-[60%]">
+              <span className="absolute top-1 left-1 bg-ink/70 text-cream text-xs px-1 font-body truncate max-w-[60%]">
                 {nameOf(p.uploaderId)}
               </span>
             </button>
@@ -416,6 +491,12 @@ function RevealPhase({
   const nameOf = (id: string) =>
     players.find((p) => p.user_id === id)?.display_name ?? "Someone";
   const myWins = ranked.filter((r) => r.photo.uploaderId === meId && r.count > 0);
+
+  const votesPhrase = (n: number) =>
+    n === 1 ? labels.revealVotesOne : fmt(labels.revealVotesMany, { n });
+  const photosPhrase = (n: number) =>
+    n === 1 ? labels.revealPhotosOne : fmt(labels.revealPhotosMany, { n });
+  const myVoteTotal = myWins.reduce((s, r) => s + r.count, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -456,7 +537,7 @@ function RevealPhase({
                   {nameOf(r.photo.uploaderId)}
                 </p>
                 <p className="font-body text-xs text-ink/60">
-                  {r.count} vote{r.count === 1 ? "" : "s"}
+                  {votesPhrase(r.count)}
                 </p>
               </div>
             </li>
@@ -465,9 +546,10 @@ function RevealPhase({
       )}
       {myWins.length > 0 && (
         <p className="font-body text-sm text-ink italic">
-          You picked up {myWins.reduce((s, r) => s + r.count, 0)} vote
-          {myWins.reduce((s, r) => s + r.count, 0) === 1 ? "" : "s"} across{" "}
-          {myWins.length} photo{myWins.length === 1 ? "" : "s"}.
+          {fmt(labels.revealRecap, {
+            votes: votesPhrase(myVoteTotal),
+            photos: photosPhrase(myWins.length),
+          })}
         </p>
       )}
     </div>

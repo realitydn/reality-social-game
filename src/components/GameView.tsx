@@ -105,24 +105,22 @@ export default function GameView({
   );
 
   const handleBingoResolve = useCallback(
-    async (claimId: string, action: "confirm" | "deny") => {
-      await postEvent({
+    (claimId: string, action: "confirm" | "deny") =>
+      postEvent({
         kind: action === "confirm" ? "bingo_confirm" : "bingo_deny",
         claimId,
-      });
-    },
+      }),
     [postEvent],
   );
 
   const handleTag = useCallback(() => postEvent({ kind: "target_hunt_tag_claim" }), [postEvent]);
 
   const handleTagResolve = useCallback(
-    async (claimId: string, action: "confirm" | "deny") => {
-      await postEvent({
+    (claimId: string, action: "confirm" | "deny") =>
+      postEvent({
         kind: action === "confirm" ? "target_hunt_tag_confirm" : "target_hunt_tag_deny",
         claimId,
-      });
-    },
+      }),
     [postEvent],
   );
 

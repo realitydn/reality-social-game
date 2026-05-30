@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { KaraokeQueueGame } from "@/games/karaoke-queue";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
+import { type Locale } from "@/i18n/locales";
 import type { SessionPlayer } from "@/lib/sessions";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
 
@@ -13,10 +15,16 @@ type Dashboard = {
 type Props = {
   sessionId: string;
   initial: Dashboard;
+  locale?: Locale;
 };
 
-export default function KaraokeQueueBigScreen({ sessionId, initial }: Props) {
+export default function KaraokeQueueBigScreen({
+  sessionId,
+  initial,
+  locale = "en",
+}: Props) {
   const [data, setData] = useState<Dashboard>(initial);
+  const labels = KaraokeQueueGame.prompts(locale);
 
   const refresh = useCallback(async () => {
     try {
@@ -38,7 +46,7 @@ export default function KaraokeQueueBigScreen({ sessionId, initial }: Props) {
   if (!state) return null;
 
   const nameOf = (id: string) =>
-    data.players.find((p) => p.user_id === id)?.display_name ?? "Someone";
+    data.players.find((p) => p.user_id === id)?.display_name ?? labels.someone;
 
   if (state.ended) {
     return (
@@ -47,9 +55,9 @@ export default function KaraokeQueueBigScreen({ sessionId, initial }: Props) {
           className="font-display font-bold text-6xl uppercase text-yellow text-center"
           style={{ letterSpacing: "0.05em" }}
         >
-          Karaoke
+          {labels.title}
           <br />
-          <span className="text-cream/70 text-3xl">Queue closed</span>
+          <span className="text-cream/70 text-3xl">{labels.queueClosed}</span>
         </p>
       </div>
     );
@@ -67,10 +75,10 @@ export default function KaraokeQueueBigScreen({ sessionId, initial }: Props) {
             className="font-display font-semibold text-xl uppercase text-yellow"
             style={{ letterSpacing: "0.05em" }}
           >
-            Now up
+            {labels.nowUp}
           </p>
           <p
-            className="font-display font-bold text-7xl uppercase text-cream leading-tight break-words"
+            className="font-display font-bold text-7xl uppercase text-cream leading-tight break-words line-clamp-2"
             style={{ letterSpacing: "0.05em" }}
           >
             {current.songTitle}
@@ -88,13 +96,13 @@ export default function KaraokeQueueBigScreen({ sessionId, initial }: Props) {
             className="font-display font-bold text-5xl uppercase text-yellow"
             style={{ letterSpacing: "0.05em" }}
           >
-            Karaoke Queue
+            {labels.title}
           </p>
           <p
             className="font-display font-semibold text-2xl uppercase text-cream/70"
             style={{ letterSpacing: "0.05em" }}
           >
-            Submit a song from your phone
+            {labels.submitFromPhone}
           </p>
         </div>
       )}
@@ -105,7 +113,7 @@ export default function KaraokeQueueBigScreen({ sessionId, initial }: Props) {
             className="font-display font-semibold text-base uppercase text-cream/60"
             style={{ letterSpacing: "0.05em" }}
           >
-            Up next
+            {labels.upNext}
           </p>
           <ol className="flex flex-col gap-1">
             {upcoming.map((r, i) => (
@@ -137,7 +145,7 @@ export default function KaraokeQueueBigScreen({ sessionId, initial }: Props) {
             className="font-display font-semibold text-xs uppercase text-cream/40"
             style={{ letterSpacing: "0.05em" }}
           >
-            Already performed
+            {labels.alreadyPerformed}
           </p>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {recent.map((r) => (

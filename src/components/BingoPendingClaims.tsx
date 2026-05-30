@@ -12,11 +12,12 @@ type Props = {
   players: Player[];
   locale: Locale;
   labels: Record<string, string>;
-  onResolve: (claimId: string, action: "confirm" | "deny") => Promise<void>;
+  onResolve: (claimId: string, action: "confirm" | "deny") => Promise<{ ok: boolean; error?: string }>;
 };
 
 export default function BingoPendingClaims({ pending, players, locale, labels, onResolve }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   if (pending.length === 0) return null;
 
   function nameOf(userId: string): string {
@@ -25,8 +26,10 @@ export default function BingoPendingClaims({ pending, players, locale, labels, o
 
   async function resolve(claimId: string, action: "confirm" | "deny") {
     setBusy(claimId);
-    await onResolve(claimId, action);
+    setError(null);
+    const r = await onResolve(claimId, action);
     setBusy(null);
+    if (!r.ok) setError(r.error ?? "Could not update the claim");
   }
 
   return (
@@ -74,6 +77,7 @@ export default function BingoPendingClaims({ pending, players, locale, labels, o
           </div>
         );
       })}
+      {error && <p className="font-body text-red text-sm">{error}</p>}
     </div>
   );
 }

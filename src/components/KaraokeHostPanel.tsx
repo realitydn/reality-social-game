@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import ConfirmModal from "@/components/ConfirmModal";
+import LiveBadge from "@/components/LiveBadge";
+import { KaraokeQueueGame } from "@/games/karaoke-queue";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
+import { type Locale } from "@/i18n/locales";
 import type { SessionPlayer } from "@/lib/sessions";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
 
@@ -16,6 +20,7 @@ type Props = {
   gameId: string;
   initialState: KaraokeQueueState;
   initialPlayers: SessionPlayer[];
+  locale?: Locale;
 };
 
 export default function KaraokeHostPanel({
@@ -23,13 +28,18 @@ export default function KaraokeHostPanel({
   gameId,
   initialState,
   initialPlayers,
+  locale = "en",
 }: Props) {
+  const labels = KaraokeQueueGame.prompts(locale);
   const [state, setState] = useState<KaraokeQueueState>(initialState);
   const [players, setPlayers] = useState<SessionPlayer[]>(initialPlayers);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  // Confirm dialogs for the irreversible actions (replacing window.confirm).
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -49,11 +59,13 @@ export default function KaraokeHostPanel({
     return () => clearInterval(id);
   }, [refresh]);
 
-  useRoomNotifications(sessionId, refresh);
+  const { connected } = useRoomNotifications(sessionId, refresh);
 
-  const post = useCallback(
+  // Fire-and-forget POST that does NOT flip `busy` — used for optimistic
+  // actions (reorder) where we've already updated local state and don't want to
+  // freeze the whole panel between taps. The 2s poll / realtime ping reconciles.
+  const send = useCallback(
     async (body: unknown) => {
-      setBusy(true);
       setError(null);
       try {
         const res = await fetch(`/api/games/${gameId}/events`, {
@@ -64,22 +76,38 @@ export default function KaraokeHostPanel({
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
           setError(j.error ?? "Action failed");
-        } else {
-          await refresh();
+          await refresh(); // resync local state back to the server's truth
         }
-      } finally {
-        setBusy(false);
+      } catch {
+        setError("Action failed");
+        await refresh();
       }
     },
     [gameId, refresh],
   );
 
+  const post = useCallback(
+    async (body: unknown) => {
+      setBusy(true);
+      try {
+        await send(body);
+        await refresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [send, refresh],
+  );
+
+  // Optimistic reorder: swap in local state immediately, then POST the new
+  // order. Taps feel instant and don't block each other.
   const move = (idx: number, dir: -1 | 1) => {
     const target = idx + dir;
     if (target < 0 || target >= state.queue.length) return;
     const next = [...state.queue];
     [next[idx], next[target]] = [next[target], next[idx]];
-    void post({
+    setState((s) => ({ ...s, queue: next }));
+    void send({
       kind: "karaoke_reorder",
       orderedIds: next.map((r) => r.id),
     });
@@ -102,19 +130,23 @@ export default function KaraokeHostPanel({
 
   const complete = (id: string) =>
     void post({ kind: "karaoke_complete", requestId: id });
-  const remove = (id: string) => {
-    if (typeof window !== "undefined" && !window.confirm("Remove this request?"))
-      return;
-    void post({ kind: "karaoke_delete", requestId: id });
+
+  const removeRequest = async () => {
+    if (!confirmRemoveId) return;
+    await post({ kind: "karaoke_delete", requestId: confirmRemoveId });
+    setConfirmRemoveId(null);
   };
-  const closeQueue = () => {
-    if (typeof window !== "undefined" && !window.confirm("Close the karaoke queue?"))
-      return;
-    void post({ kind: "karaoke_end" });
+  const closeQueue = async () => {
+    await post({ kind: "karaoke_end" });
+    setConfirmClose(false);
   };
 
   const nameOf = (id: string) =>
-    players.find((p) => p.user_id === id)?.display_name ?? "Unknown";
+    players.find((p) => p.user_id === id)?.display_name ?? labels.someone;
+
+  const removeTarget = confirmRemoveId
+    ? state.queue.find((r) => r.id === confirmRemoveId)
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,24 +155,25 @@ export default function KaraokeHostPanel({
           className="font-display font-bold text-3xl uppercase"
           style={{ letterSpacing: "0.05em" }}
         >
-          {state.ended ? "Queue closed" : `${state.queue.length} in queue`}
+          {state.ended
+            ? labels.queueClosed
+            : `${state.queue.length} ${labels.inQueueSuffix}`}
         </span>
         {state.ended && (
           <span
             className="font-display font-semibold text-xs uppercase text-ink/60 px-2 py-1 border-2 border-ink"
             style={{ letterSpacing: "0.05em" }}
           >
-            ended
+            {labels.ended}
           </span>
         )}
+        <LiveBadge connected={connected} className="ml-auto" />
       </div>
 
       {error && <p className="font-body text-red text-sm">{error}</p>}
 
       {state.queue.length === 0 ? (
-        <p className="font-body text-ink/60 italic">
-          Queue is empty. Players submit songs from their phones.
-        </p>
+        <p className="font-body text-ink/60 italic">{labels.queueEmptyHost}</p>
       ) : (
         <ol className="flex flex-col gap-2">
           {state.queue.map((r, i) => {
@@ -169,17 +202,17 @@ export default function KaraokeHostPanel({
                       type="button"
                       onClick={saveEdit}
                       disabled={busy || !editTitle.trim()}
-                      className="bg-ink text-cream font-display font-bold uppercase px-3 py-1 text-xs disabled:opacity-50"
+                      className="bg-ink text-cream font-display font-bold uppercase px-4 min-h-[44px] text-sm disabled:opacity-50"
                       style={{ letterSpacing: "0.05em" }}
                     >
-                      Save
+                      {labels.save}
                     </button>
                     <button
                       type="button"
                       onClick={cancelEdit}
-                      className="font-body text-sm text-ink/60"
+                      className="font-body text-sm text-ink/60 px-3 min-h-[44px]"
                     >
-                      Cancel
+                      {labels.cancel}
                     </button>
                   </>
                 ) : (
@@ -195,12 +228,12 @@ export default function KaraokeHostPanel({
                         {nameOf(r.playerId)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => move(i, -1)}
-                        disabled={busy || i === 0}
-                        className="px-2 py-1 border-2 border-ink disabled:opacity-30"
+                        disabled={i === 0}
+                        className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-xl border-2 border-ink disabled:opacity-30"
                         aria-label="Move up"
                       >
                         ↑
@@ -208,8 +241,8 @@ export default function KaraokeHostPanel({
                       <button
                         type="button"
                         onClick={() => move(i, 1)}
-                        disabled={busy || i === state.queue.length - 1}
-                        className="px-2 py-1 border-2 border-ink disabled:opacity-30"
+                        disabled={i === state.queue.length - 1}
+                        className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-xl border-2 border-ink disabled:opacity-30"
                         aria-label="Move down"
                       >
                         ↓
@@ -218,7 +251,7 @@ export default function KaraokeHostPanel({
                         type="button"
                         onClick={() => startEdit(r.id, r.songTitle)}
                         disabled={busy}
-                        className="px-2 py-1 border-2 border-ink disabled:opacity-30"
+                        className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-xl border-2 border-ink disabled:opacity-30"
                         aria-label="Edit title"
                       >
                         ✎
@@ -227,16 +260,16 @@ export default function KaraokeHostPanel({
                         type="button"
                         onClick={() => complete(r.id)}
                         disabled={busy}
-                        className="px-2 py-1 border-2 border-yellow bg-yellow text-ink font-display font-bold disabled:opacity-30"
+                        className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-xl border-2 border-yellow bg-yellow text-ink font-display font-bold disabled:opacity-30"
                         aria-label="Mark performed"
                       >
                         ✓
                       </button>
                       <button
                         type="button"
-                        onClick={() => remove(r.id)}
+                        onClick={() => setConfirmRemoveId(r.id)}
                         disabled={busy}
-                        className="px-2 py-1 border-2 border-red text-red disabled:opacity-30"
+                        className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] text-2xl leading-none border-2 border-red text-red disabled:opacity-30 ml-auto"
                         aria-label="Delete request"
                       >
                         ×
@@ -253,12 +286,12 @@ export default function KaraokeHostPanel({
       {!state.ended && (
         <button
           type="button"
-          onClick={closeQueue}
+          onClick={() => setConfirmClose(true)}
           disabled={busy}
-          className="border-2 border-red text-red font-display font-bold uppercase px-5 py-3 self-start"
+          className="border-2 border-red text-red font-display font-bold uppercase px-5 py-3 self-start disabled:opacity-50"
           style={{ letterSpacing: "0.05em" }}
         >
-          Close queue
+          {labels.closeQueue}
         </button>
       )}
 
@@ -268,7 +301,7 @@ export default function KaraokeHostPanel({
             className="font-display font-semibold text-xs uppercase text-ink/60 cursor-pointer"
             style={{ letterSpacing: "0.05em" }}
           >
-            Performed ({state.completed.length})
+            {labels.completed} ({state.completed.length})
           </summary>
           <ul className="flex flex-col gap-1 mt-2">
             {state.completed.slice().reverse().map((r) => (
@@ -285,6 +318,34 @@ export default function KaraokeHostPanel({
           </ul>
         </details>
       )}
+
+      <ConfirmModal
+        open={!!confirmRemoveId}
+        title={labels.removeTitle}
+        body={
+          removeTarget
+            ? `${removeTarget.songTitle} — ${nameOf(removeTarget.playerId)}. ${labels.removeBody}`
+            : labels.removeBody
+        }
+        confirmLabel={labels.removeConfirm}
+        cancelLabel={labels.cancel}
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void removeRequest()}
+        onCancel={() => setConfirmRemoveId(null)}
+      />
+
+      <ConfirmModal
+        open={confirmClose}
+        title={labels.closeQueueTitle}
+        body={`${state.queue.length} ${labels.inQueueSuffix}. ${labels.closeQueueBody}`}
+        confirmLabel={labels.closeQueueConfirm}
+        cancelLabel={labels.cancel}
+        tone="danger"
+        busy={busy}
+        onConfirm={() => void closeQueue()}
+        onCancel={() => setConfirmClose(false)}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import { QuizRoundGame } from "@/games/quiz-round";
 import type { SessionPlayer } from "@/lib/sessions";
 import type { MCQData } from "@/games/quiz-round/question-types/multiple-choice";
 import type { TFData } from "@/games/quiz-round/question-types/true-false";
@@ -9,6 +10,7 @@ import type { FreeTextData } from "@/games/quiz-round/question-types/free-text";
 import type { OrderingData } from "@/games/quiz-round/question-types/ordering";
 import type { AudioMCQData } from "@/games/quiz-round/question-types/audio-mcq";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
+import { type Locale } from "@/i18n/locales";
 
 type Dashboard = {
   gameState: QuizRoundState | null;
@@ -19,7 +21,10 @@ type Dashboard = {
 type Props = {
   sessionId: string;
   initial: Dashboard;
+  locale?: Locale;
 };
+
+type Labels = Record<string, string>;
 
 const SWATCH_BG = [
   "bg-yellow",
@@ -32,8 +37,9 @@ const SWATCH_BG = [
   "bg-green",
 ];
 
-export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
+export default function QuizRoundBigScreen({ sessionId, initial, locale = "en" }: Props) {
   const [data, setData] = useState<Dashboard>(initial);
+  const labels = QuizRoundGame.prompts(locale);
 
   const refresh = useCallback(async () => {
     try {
@@ -55,7 +61,7 @@ export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
   if (!state) return null;
 
   if (state.phase === "ended") {
-    return <FinalPodium players={data.players} scores={data.scores} />;
+    return <FinalPodium players={data.players} scores={data.scores} labels={labels} />;
   }
 
   if (state.phase === "lobby" || state.currentIdx === null) {
@@ -65,9 +71,9 @@ export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
           className="font-display font-bold text-7xl uppercase text-yellow text-center"
           style={{ letterSpacing: "0.05em" }}
         >
-          Quiz Round
+          {labels.title}
           <br />
-          <span className="text-cream/70 text-4xl">Get ready</span>
+          <span className="text-cream/70 text-4xl">{labels.getReady}</span>
         </p>
       </div>
     );
@@ -92,7 +98,7 @@ export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
           Q{idx + 1} / {state.questions.length}
         </span>
         <span className="font-display font-semibold text-xl text-cream/60 tabular-nums">
-          {answeredCount} / {totalPlayers} answered
+          {answeredCount} / {totalPlayers} {labels.answered}
         </span>
       </div>
 
@@ -108,18 +114,21 @@ export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
           data={q.data as TFData}
           submissions={submissions}
           phase={state.phase}
+          labels={labels}
         />
       )}
       {q.type === "free-text" && (
         <FreeTextBigScreen
           data={q.data as FreeTextData}
           phase={state.phase}
+          labels={labels}
         />
       )}
       {q.type === "ordering" && (
         <OrderingBigScreen
           data={q.data as OrderingData}
           phase={state.phase}
+          labels={labels}
         />
       )}
       {q.type === "audio-mcq" && (
@@ -127,6 +136,7 @@ export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
           data={q.data as AudioMCQData}
           submissions={submissions}
           phase={state.phase}
+          labels={labels}
         />
       )}
 
@@ -138,7 +148,7 @@ export default function QuizRoundBigScreen({ sessionId, initial }: Props) {
       )}
 
       {showInterLeaderboard && (
-        <InterLeaderboard players={data.players} scores={state.scores} />
+        <InterLeaderboard players={data.players} scores={state.scores} labels={labels} />
       )}
     </div>
   );
@@ -195,7 +205,7 @@ function MCQBigScreen({
             >
               {showCorrect && (
                 <div
-                  className="absolute inset-y-0 left-0 bg-cream/10"
+                  className={`absolute inset-y-0 left-0 ${isCorrect ? "bg-ink/15" : "bg-cream/30"}`}
                   style={{ width: `${pct}%` }}
                 />
               )}
@@ -209,7 +219,7 @@ function MCQBigScreen({
                   />
                 )}
                 <span
-                  className="font-display font-bold text-3xl uppercase truncate flex-1"
+                  className="font-display font-bold text-3xl uppercase line-clamp-2 flex-1"
                   style={{ letterSpacing: "0.05em" }}
                 >
                   {isCorrect && <span className="mr-2">✓</span>}
@@ -231,10 +241,12 @@ function TFBigScreen({
   data,
   submissions,
   phase,
+  labels,
 }: {
   data: TFData;
   submissions: Record<string, { value: unknown }>;
   phase: QuizRoundState["phase"];
+  labels: Labels;
 }) {
   const showCorrect = phase === "revealed";
   let trueCount = 0;
@@ -255,8 +267,8 @@ function TFBigScreen({
       </h1>
       <div className="grid grid-cols-2 gap-4">
         {[
-          { v: true, label: "True", count: trueCount },
-          { v: false, label: "False", count: falseCount },
+          { v: true, label: labels.trueLabel, count: trueCount },
+          { v: false, label: labels.falseLabel, count: falseCount },
         ].map(({ v, label, count }) => {
           const isCorrect = showCorrect && data.correctValue === v;
           return (
@@ -291,9 +303,11 @@ function TFBigScreen({
 function FreeTextBigScreen({
   data,
   phase,
+  labels,
 }: {
   data: FreeTextData;
   phase: QuizRoundState["phase"];
+  labels: Labels;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -308,12 +322,12 @@ function FreeTextBigScreen({
         {data.prompt}
       </h1>
       <p className="font-display font-semibold text-2xl uppercase text-cream/60" style={{ letterSpacing: "0.05em" }}>
-        Type your answer on your phone
+        {labels.answerOnPhone}
       </p>
       {phase === "revealed" && (
         <div className="border-4 border-yellow bg-yellow/20 p-6">
           <p className="font-display font-semibold text-base uppercase text-cream/70 mb-2" style={{ letterSpacing: "0.05em" }}>
-            Accepted answers
+            {labels.acceptedAnswers}
           </p>
           <p
             className="font-display font-bold text-4xl uppercase text-yellow leading-tight"
@@ -330,9 +344,11 @@ function FreeTextBigScreen({
 function OrderingBigScreen({
   data,
   phase,
+  labels,
 }: {
   data: OrderingData;
   phase: QuizRoundState["phase"];
+  labels: Labels;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -347,7 +363,7 @@ function OrderingBigScreen({
         {data.prompt}
       </h1>
       <p className="font-display font-semibold text-xl uppercase text-cream/60" style={{ letterSpacing: "0.05em" }}>
-        {phase === "revealed" ? "Correct order:" : "Drag to order on your phone"}
+        {phase === "revealed" ? labels.correctOrder : labels.orderOnPhone}
       </p>
       <ol className="flex flex-col gap-2">
         {data.items.map((it, i) => (
@@ -383,10 +399,12 @@ function AudioMCQBigScreen({
   data,
   submissions,
   phase,
+  labels,
 }: {
   data: AudioMCQData;
   submissions: Record<string, { value: unknown }>;
   phase: QuizRoundState["phase"];
+  labels: Labels;
 }) {
   const [playing, setPlaying] = useState(false);
   const showCorrect = phase === "revealed";
@@ -414,7 +432,7 @@ function AudioMCQBigScreen({
             onPause={() => setPlaying(false)}
           />
           <span className="font-display font-semibold text-cream/60 text-base">
-            {playing ? "Playing…" : "Tap play"}
+            {playing ? labels.nowPlaying : labels.tapPlay}
           </span>
         </div>
       )}
@@ -433,16 +451,16 @@ function AudioMCQBigScreen({
                   : "border-cream text-cream"
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <span
-                  className="font-display font-bold text-3xl uppercase truncate"
+                  className="font-display font-bold text-3xl uppercase line-clamp-2 flex-1"
                   style={{ letterSpacing: "0.05em" }}
                 >
                   {isCorrect && <span className="mr-2">✓</span>}
                   {opt.text}
                 </span>
                 {showCorrect && (
-                  <span className="font-display font-bold text-2xl tabular-nums">{count}</span>
+                  <span className="font-display font-bold text-2xl tabular-nums shrink-0">{count}</span>
                 )}
               </div>
             </div>
@@ -491,9 +509,11 @@ function BigScreenCountdown({
 function InterLeaderboard({
   players,
   scores,
+  labels,
 }: {
   players: SessionPlayer[];
   scores: Record<string, number>;
+  labels: Labels;
 }) {
   const ranked = players
     .map((p) => ({ player: p, score: scores[p.user_id] ?? 0 }))
@@ -509,20 +529,20 @@ function InterLeaderboard({
         className="font-display font-semibold text-sm uppercase text-cream/60"
         style={{ letterSpacing: "0.05em" }}
       >
-        Leaderboard
+        {labels.leaderboard}
       </p>
       {ranked.map((r, i) => (
         <div
           key={r.player.user_id}
-          className={`flex items-center justify-between p-2 ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
+          className={`flex items-center justify-between gap-4 p-2 ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
         >
           <span
-            className="font-display font-bold text-2xl uppercase truncate"
+            className="font-display font-bold text-2xl uppercase line-clamp-2"
             style={{ letterSpacing: "0.05em" }}
           >
             {i + 1}. {r.player.display_name}
           </span>
-          <span className="font-display font-bold text-2xl tabular-nums">{r.score}</span>
+          <span className="font-display font-bold text-2xl tabular-nums shrink-0">{r.score}</span>
         </div>
       ))}
     </div>
@@ -532,9 +552,11 @@ function InterLeaderboard({
 function FinalPodium({
   players,
   scores,
+  labels,
 }: {
   players: SessionPlayer[];
   scores: Record<string, number>;
+  labels: Labels;
 }) {
   const ranked = players
     .map((p) => ({ player: p, score: scores[p.user_id] ?? 0 }))
@@ -547,21 +569,21 @@ function FinalPodium({
         className="font-display font-bold text-6xl uppercase text-yellow"
         style={{ letterSpacing: "0.05em" }}
       >
-        Round complete
+        {labels.roundComplete}
       </p>
       <div className="flex flex-col gap-2 w-full max-w-2xl">
         {ranked.map((r, i) => (
           <div
             key={r.player.user_id}
-            className={`flex items-center justify-between p-4 ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
+            className={`flex items-center justify-between gap-4 p-4 ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
           >
             <span
-              className="font-display font-bold text-3xl uppercase truncate"
+              className="font-display font-bold text-3xl uppercase line-clamp-2"
               style={{ letterSpacing: "0.05em" }}
             >
               {i + 1}. {r.player.display_name}
             </span>
-            <span className="font-display font-bold text-3xl tabular-nums">{r.score}</span>
+            <span className="font-display font-bold text-3xl tabular-nums shrink-0">{r.score}</span>
           </div>
         ))}
       </div>

@@ -142,6 +142,20 @@ export default function QuizRoundView({ state, meId, labels, onAnswer }: Props) 
         />
       )}
 
+      {state.phase === "question" && myAnswer && (
+        <div
+          className="border-2 border-dashed border-ink/30 p-3 text-center font-body text-sm text-ink/60"
+        >
+          {labels.waitingForReveal}
+        </div>
+      )}
+
+      {state.phase !== "question" && state.phase !== "revealed" && (
+        <div className="border-2 border-dashed border-ink/30 p-6 text-center font-body text-sm text-ink/50">
+          {labels.waitingForHost}
+        </div>
+      )}
+
       {state.phase === "revealed" && reveal && (
         <div className="border-2 border-ink p-3 flex items-center justify-between">
           <span
@@ -232,13 +246,17 @@ function MCQPlayerInner({
                   className="h-14 w-14 object-cover border border-ink/30 shrink-0"
                 />
               )}
-              <span className="flex-1">{opt.text}</span>
+              <span className="flex-1">
+                {isCorrect && <span className="mr-1">✓ </span>}
+                {isWrongPick && <span className="mr-1">✗ </span>}
+                {opt.text}
+              </span>
             </button>
           );
         })}
       </div>
       {myAnswer && phase === "question" && (
-        <p className="font-body text-xs text-ink/60 italic">{labels.answerLocked}</p>
+        <AnswerLockedBanner label={labels.answerLocked} />
       )}
       {error && <p className="font-body text-red text-sm">{error}</p>}
     </div>
@@ -303,13 +321,15 @@ function TFPlayerInner({
               className={`border-2 p-6 font-display font-bold text-2xl uppercase transition disabled:cursor-not-allowed ${cls}`}
               style={{ letterSpacing: "0.05em" }}
             >
-              {v ? "True" : "False"}
+              {isCorrect && <span className="mr-1">✓ </span>}
+              {isWrongPick && <span className="mr-1">✗ </span>}
+              {v ? labels.trueLabel : labels.falseLabel}
             </button>
           );
         })}
       </div>
       {myAnswer && phase === "question" && (
-        <p className="font-body text-xs text-ink/60 italic">{labels.answerLocked}</p>
+        <AnswerLockedBanner label={labels.answerLocked} />
       )}
       {error && <p className="font-body text-red text-sm">{error}</p>}
     </div>
@@ -358,7 +378,7 @@ function FreeTextPlayerInner({
       {myAnswer ? (
         <div className="border-2 border-ink p-3">
           <p className="font-display font-semibold text-xs uppercase text-ink/60" style={{ letterSpacing: "0.05em" }}>
-            Your answer
+            {labels.yourAnswer}
           </p>
           <p className="font-display font-bold text-xl uppercase" style={{ letterSpacing: "0.05em" }}>
             {myText}
@@ -371,7 +391,7 @@ function FreeTextPlayerInner({
             value={text}
             onChange={(e) => setText(e.target.value)}
             disabled={phase !== "question"}
-            placeholder="Type your answer"
+            placeholder={labels.typeYourAnswer}
             maxLength={200}
             className="border-2 border-ink px-3 py-2 font-body text-base"
           />
@@ -381,21 +401,21 @@ function FreeTextPlayerInner({
             className="bg-ink text-cream font-display font-bold uppercase px-6 py-3 disabled:opacity-50"
             style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
           >
-            Submit
+            {labels.submit}
           </button>
         </form>
       )}
       {phase === "revealed" && revealedAccepted && (
         <div className="border-2 border-yellow bg-yellow/10 p-3">
           <p className="font-display font-semibold text-xs uppercase text-ink/60 mb-1" style={{ letterSpacing: "0.05em" }}>
-            Accepted answers
+            {labels.acceptedAnswers}
           </p>
           <p className="font-body">{revealedAccepted.join(" / ")}</p>
         </div>
       )}
       {error && <p className="font-body text-red text-sm">{error}</p>}
       {myAnswer && phase === "question" && (
-        <p className="font-body text-xs text-ink/60 italic">{labels.answerLocked}</p>
+        <AnswerLockedBanner label={labels.answerLocked} />
       )}
     </div>
   );
@@ -486,7 +506,19 @@ function OrderingPlayerInner({
     if (!r.ok) setError(r.error ?? "Could not submit");
   };
 
+  // Primary reorder input: tapping ▲/▼ swaps with the neighbour. Far more
+  // reliable than drag on a phone in a dim bar; drag stays as an enhancement.
+  const move = (from: number, dir: -1 | 1) => {
+    if (myAnswer || phase !== "question") return;
+    const to = from + dir;
+    if (to < 0 || to >= order.length) return;
+    const next = [...order];
+    [next[from], next[to]] = [next[to], next[from]];
+    setOrder(next);
+  };
+
   const correctOrder = revealedItems?.map((i) => i.id) ?? null;
+  const interactive = phase === "question" && !myAnswer;
 
   return (
     <div className="flex flex-col gap-3">
@@ -497,9 +529,7 @@ function OrderingPlayerInner({
       <h2 className="font-display font-bold text-2xl uppercase" style={{ letterSpacing: "0.05em" }}>
         {data.prompt}
       </h2>
-      <p className="font-body text-xs text-ink/60 italic">
-        Drag to rearrange. Top = first.
-      </p>
+      <p className="font-body text-xs text-ink/60 italic">{labels.orderingHint}</p>
       <ol ref={listRef} className="flex flex-col gap-2">
         {order.map((id, i) => {
           const item = data.items.find((it) => it.id === id);
@@ -523,7 +553,7 @@ function OrderingPlayerInner({
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
               className={`border-2 p-3 flex items-center gap-3 select-none ${cls} ${
-                phase === "question" && !myAnswer ? "cursor-grab" : "cursor-default"
+                interactive ? "cursor-grab" : "cursor-default"
               }`}
               style={{ touchAction: "none" }}
             >
@@ -531,14 +561,38 @@ function OrderingPlayerInner({
                 {i + 1}.
               </span>
               <span className="font-body flex-1">{item.text}</span>
-              {phase === "question" && !myAnswer && (
-                <span className="font-display font-bold text-xl text-ink/40">⋮⋮</span>
+              {interactive && (
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button
+                    type="button"
+                    aria-label={labels.moveUp}
+                    disabled={i === 0}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => move(i, -1)}
+                    className="border-2 border-ink px-2 py-0.5 font-display font-bold text-lg leading-none disabled:opacity-20 active:bg-ink active:text-cream"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={labels.moveDown}
+                    disabled={i === order.length - 1}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => move(i, 1)}
+                    className="border-2 border-ink px-2 py-0.5 font-display font-bold text-lg leading-none disabled:opacity-20 active:bg-ink active:text-cream"
+                  >
+                    ▼
+                  </button>
+                </div>
+              )}
+              {interactive && (
+                <span className="font-display font-bold text-xl text-ink/70">⋮⋮</span>
               )}
             </li>
           );
         })}
       </ol>
-      {phase === "question" && !myAnswer && (
+      {interactive && (
         <button
           type="button"
           onClick={submit}
@@ -546,11 +600,11 @@ function OrderingPlayerInner({
           className="bg-ink text-cream font-display font-bold uppercase px-6 py-3 disabled:opacity-50"
           style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
         >
-          Submit order
+          {labels.submitOrder}
         </button>
       )}
       {myAnswer && phase === "question" && (
-        <p className="font-body text-xs text-ink/60 italic">{labels.answerLocked}</p>
+        <AnswerLockedBanner label={labels.answerLocked} />
       )}
       {error && <p className="font-body text-red text-sm">{error}</p>}
     </div>
@@ -614,15 +668,38 @@ function AudioMCQPlayerInner({
               onClick={() => submit(opt.id)}
               className={`border-2 p-4 font-body text-left transition disabled:cursor-not-allowed ${cls}`}
             >
+              {isCorrect && <span className="mr-1">✓ </span>}
+              {isWrongPick && <span className="mr-1">✗ </span>}
               {opt.text}
             </button>
           );
         })}
       </div>
       {myAnswer && phase === "question" && (
-        <p className="font-body text-xs text-ink/60 italic">{labels.answerLocked}</p>
+        <AnswerLockedBanner label={labels.answerLocked} />
       )}
       {error && <p className="font-body text-red text-sm">{error}</p>}
+    </div>
+  );
+}
+
+// Loud, full-width confirmation shown the instant an answer locks — far more
+// reassuring across a noisy bar than the old faint italic line. `tone` lets a
+// caller flip to yellow where teal would clash with the surrounding state.
+function AnswerLockedBanner({
+  label,
+  tone = "teal",
+}: {
+  label: string;
+  tone?: "teal" | "yellow";
+}) {
+  return (
+    <div
+      className={`${tone === "teal" ? "bg-teal text-cream" : "bg-yellow text-ink"} p-4 font-display font-bold text-base uppercase text-center`}
+      style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+      role="status"
+    >
+      ✓ {label}
     </div>
   );
 }
@@ -646,16 +723,19 @@ function Countdown({
   const elapsed = (now - openedAt) / 1000;
   const remaining = Math.max(0, timerSecs - elapsed);
   const pct = Math.max(0, Math.min(100, (remaining / timerSecs) * 100));
+  const urgent = remaining <= 5;
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="h-2 bg-ink/10 overflow-hidden">
+    <div className="flex items-center gap-3">
+      <div className="flex-1 h-3 bg-ink/10 overflow-hidden">
         <div
-          className="h-full bg-ink transition-all duration-200"
+          className={`h-full transition-all duration-200 ${urgent ? "bg-red" : "bg-ink"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="font-body text-xs text-ink/60 self-end">
+      <span
+        className={`font-display font-bold text-lg tabular-nums w-12 text-right ${urgent ? "text-red" : "text-ink"}`}
+      >
         {Math.ceil(remaining)}s
       </span>
     </div>

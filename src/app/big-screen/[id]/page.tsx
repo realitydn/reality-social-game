@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
+import { isLocale, type Locale } from "@/i18n/locales";
 import { getSession, listPlayers } from "@/lib/sessions";
 import { getActiveGame, getGameState, getScores } from "@/lib/games";
 import { getBaseUrl } from "@/lib/url";
@@ -49,6 +51,9 @@ export default async function BigScreenPage({
   const baseUrl = await getBaseUrl();
   const joinUrl = `${baseUrl}/s/${session.id}`;
   const game = await getActiveGame(session.id);
+  const localeRaw = await getLocale();
+  const locale: Locale = isLocale(localeRaw) ? localeRaw : "en";
+  const t = await getTranslations("bigScreen");
   const gameState = game ? await getGameState(game) : null;
   const scores = game ? await getScores(game) : {};
 
@@ -87,13 +92,14 @@ export default async function BigScreenPage({
               className="font-display font-bold text-[10px] uppercase text-cream/70"
               style={{ letterSpacing: "0.05em" }}
             >
-              Scan to join
+              {t("scanToJoin")}
             </p>
           </div>
         </header>
         {game?.type === "quiz-round" && (
           <QuizRoundBigScreen
             sessionId={session.id}
+            locale={locale}
             initial={{
               gameState: gameState as QuizRoundState | null,
               players,
@@ -104,6 +110,7 @@ export default async function BigScreenPage({
         {game?.type === "karaoke-queue" && (
           <KaraokeQueueBigScreen
             sessionId={session.id}
+            locale={locale}
             initial={{
               gameState: gameState as KaraokeQueueState | null,
               players,
@@ -113,6 +120,7 @@ export default async function BigScreenPage({
         {game?.type === "disposable-camera" && (
           <DisposableCameraBigScreen
             sessionId={session.id}
+            locale={locale}
             initial={{
               gameState: gameState as DisposableCameraState | null,
               players,
@@ -150,7 +158,7 @@ export default async function BigScreenPage({
             className="font-display font-bold text-sm uppercase text-cream"
             style={{ letterSpacing: "0.05em" }}
           >
-            Scan to join
+            {t("scanToJoin")}
           </p>
           <p className="font-body text-cream/60 text-xs break-all max-w-[420px] text-center">
             {joinUrl}
@@ -164,7 +172,7 @@ export default async function BigScreenPage({
               className="font-display font-semibold text-xs uppercase text-cream/60 mb-3"
               style={{ letterSpacing: "0.05em" }}
             >
-              In the room
+              {t("inTheRoom")}
             </p>
             <AttendeeList
               sessionId={session.id}

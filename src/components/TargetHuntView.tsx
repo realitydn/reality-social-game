@@ -10,7 +10,7 @@ type Props = {
   players: SessionPlayer[];
   labels: Record<string, string>;
   onTag: () => Promise<{ ok: boolean; error?: string }>;
-  onResolve: (claimId: string, action: "confirm" | "deny") => Promise<void>;
+  onResolve: (claimId: string, action: "confirm" | "deny") => Promise<{ ok: boolean; error?: string }>;
 };
 
 export default function TargetHuntView({ state, meId, players, labels, onTag, onResolve }: Props) {
@@ -49,8 +49,10 @@ export default function TargetHuntView({ state, meId, players, labels, onTag, on
 
   async function resolve(claimId: string, action: "confirm" | "deny") {
     setBusyClaim(claimId);
-    await onResolve(claimId, action);
+    setError(null);
+    const r = await onResolve(claimId, action);
     setBusyClaim(null);
+    if (!r.ok) setError(r.error ?? "Could not update the tag");
   }
 
   return (

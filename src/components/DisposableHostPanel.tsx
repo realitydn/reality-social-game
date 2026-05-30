@@ -8,6 +8,18 @@ import type {
 import { tallyVotes } from "@/games/disposable-camera/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
+import ConfirmModal from "@/components/ConfirmModal";
+import LiveBadge from "@/components/LiveBadge";
+
+// A pending confirmation: restates the live consequence in the modal body so
+// the host isn't tapping through a bare window.confirm with no context.
+type PendingConfirm = {
+  title: string;
+  body?: string;
+  confirmLabel: string;
+  tone?: "default" | "danger";
+  run: () => void;
+};
 
 type Dashboard = {
   game: { id: string; type: string; status: string } | null;
@@ -32,6 +44,7 @@ export default function DisposableHostPanel({
   const [players, setPlayers] = useState<SessionPlayer[]>(initialPlayers);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -51,7 +64,7 @@ export default function DisposableHostPanel({
     return () => clearInterval(id);
   }, [refresh]);
 
-  useRoomNotifications(sessionId, refresh);
+  const { connected } = useRoomNotifications(sessionId, refresh);
 
   const post = useCallback(
     async (body: unknown) => {
@@ -76,26 +89,6 @@ export default function DisposableHostPanel({
     [gameId, refresh],
   );
 
-  const openVoting = () => {
-    if (typeof window !== "undefined" && !window.confirm("Close capture and open voting?"))
-      return;
-    void post({ kind: "disposable_open_voting" });
-  };
-  const openReveal = () => {
-    if (typeof window !== "undefined" && !window.confirm("Close voting and reveal?"))
-      return;
-    void post({ kind: "disposable_open_reveal" });
-  };
-  const endGame = () => {
-    if (typeof window !== "undefined" && !window.confirm("End the game?")) return;
-    void post({ kind: "disposable_end" });
-  };
-  const deletePhoto = (photoId: string) => {
-    if (typeof window !== "undefined" && !window.confirm("Delete this photo?"))
-      return;
-    void post({ kind: "disposable_photo_delete", photoId });
-  };
-
   const nameOf = (id: string) =>
     players.find((p) => p.user_id === id)?.display_name ?? "Unknown";
 
@@ -103,10 +96,60 @@ export default function DisposableHostPanel({
   const ballotsCast = Object.keys(state.votes).filter(
     (v) => (state.votes[v] ?? []).length > 0,
   ).length;
+  const playerCount = players.length;
   const counts = tallyVotes(state);
   const ranked: { photo: DisposablePhoto; count: number }[] = state.photos
     .map((photo) => ({ photo, count: counts.get(photo.id) ?? 0 }))
     .sort((a, b) => b.count - a.count);
+
+  const photographerCount = new Set(state.photos.map((p) => p.uploaderId)).size;
+
+  const openVoting = () => {
+    setConfirm({
+      title: "Open voting?",
+      body: `Capture closes — players can no longer add or delete shots. ${photoCount} photo${photoCount === 1 ? "" : "s"} from ${photographerCount} photographer${photographerCount === 1 ? "" : "s"} go to the vote.`,
+      confirmLabel: "Open voting",
+      run: () => void post({ kind: "disposable_open_voting" }),
+    });
+  };
+  const openReveal = () => {
+    const lowTurnout = playerCount > 0 && ballotsCast < playerCount;
+    const noBallots = ballotsCast === 0;
+    setConfirm({
+      title: "Reveal results?",
+      body: noBallots
+        ? `No ballots are in yet. Revealing now shows “no votes were cast” on the big screen. Give voters a moment?`
+        : lowTurnout
+          ? `Only ${ballotsCast} of ${playerCount} have voted — reveal anyway? Voting closes and the big screen locks in the current tally.`
+          : `All ${ballotsCast} ballot${ballotsCast === 1 ? "" : "s"} are in. Voting closes and the big screen reveals the winners.`,
+      // When nothing's been cast, make the host pause: the affirmative isn't a
+      // breezy "Reveal →" tap — it's a deliberate "Reveal with no votes".
+      confirmLabel: noBallots ? "Reveal with no votes" : "Reveal results",
+      tone: noBallots ? "danger" : "default",
+      run: () => void post({ kind: "disposable_open_reveal" }),
+    });
+  };
+  const endGame = () => {
+    const live = state.phase === "capturing" || state.phase === "voting";
+    setConfirm({
+      title: "End Disposable Camera?",
+      body: live
+        ? `The game ends now from the ${state.phase} phase — players can't add shots or vote after this. The big screen shows the final results.`
+        : `Close out the game and clear it from the big screen.`,
+      confirmLabel: "End game",
+      tone: "danger",
+      run: () => void post({ kind: "disposable_end" }),
+    });
+  };
+  const deletePhoto = (photoId: string) => {
+    setConfirm({
+      title: "Delete this photo?",
+      body: `It's removed from the night's roll for everyone — players see it disappear from the grid.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+      run: () => void post({ kind: "disposable_photo_delete", photoId }),
+    });
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,6 +166,7 @@ export default function DisposableHostPanel({
         >
           {state.phase}
         </span>
+        <LiveBadge connected={connected} className="ml-auto" />
       </div>
 
       <div className="flex flex-wrap gap-3 font-body text-sm text-ink/70">
@@ -234,6 +278,20 @@ export default function DisposableHostPanel({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirm !== null}
+        title={confirm?.title ?? ""}
+        body={confirm?.body}
+        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
+        tone={confirm?.tone ?? "default"}
+        busy={busy}
+        onConfirm={() => {
+          confirm?.run();
+          setConfirm(null);
+        }}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

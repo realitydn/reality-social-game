@@ -55,5 +55,14 @@
     "week": "This week",
     "allTime": "All-time",
     "empty": "No scores yet. Come play."
+  },
+  "recap": {
+    "ended": "Session ended",
+    "noScores": "No scores tonight. Until next time.",
+    "catchNext": "Catch the next one."
+  },
+  "bigScreen": {
+    "scanToJoin": "Scan to join",
+    "inTheRoom": "In the room"
   }
 }

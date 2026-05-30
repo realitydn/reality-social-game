@@ -6,6 +6,17 @@ import type { SessionPlayer } from "@/lib/sessions";
 import type { MCQData } from "@/games/quiz-round/question-types/multiple-choice";
 import type { TFData } from "@/games/quiz-round/question-types/true-false";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
+import ConfirmModal from "@/components/ConfirmModal";
+import LiveBadge from "@/components/LiveBadge";
+
+// Human-readable labels for the raw reducer `state.phase` so the host pill never
+// surfaces internal tokens like "revealed" / "lobby".
+const PHASE_LABELS: Record<QuizRoundState["phase"], string> = {
+  lobby: "Lobby",
+  question: "Question open",
+  revealed: "Answer revealed",
+  ended: "Ended",
+};
 
 type Dashboard = {
   game: { id: string; type: string; status: string } | null;
@@ -30,6 +41,7 @@ export default function HostControlPanel({
   const [players, setPlayers] = useState<SessionPlayer[]>(initialPlayers);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -49,7 +61,7 @@ export default function HostControlPanel({
     return () => clearInterval(id);
   }, [refresh]);
 
-  useRoomNotifications(sessionId, refresh);
+  const { connected } = useRoomNotifications(sessionId, refresh);
 
   const post = useCallback(
     async (body: unknown) => {
@@ -77,9 +89,9 @@ export default function HostControlPanel({
   const openQuestion = (idx: number) =>
     post({ kind: "quiz_round_open_question", questionIdx: idx });
   const closeQuestion = () => post({ kind: "quiz_round_close_question" });
-  const endGame = () => {
-    if (typeof window !== "undefined" && !window.confirm("End the quiz round?")) return;
-    post({ kind: "quiz_round_end" });
+  const confirmEndGame = async () => {
+    await post({ kind: "quiz_round_end" });
+    setConfirmEnd(false);
   };
 
   const total = state.questions.length;
@@ -88,6 +100,17 @@ export default function HostControlPanel({
   const submissions = idx !== null ? state.answers[idx] ?? {} : {};
   const reveal = idx !== null ? state.reveals[idx] : undefined;
   const isLast = idx !== null && idx === total - 1;
+  const answeredCount = Object.keys(submissions).length;
+  const outstanding = players.length - answeredCount;
+
+  // Restate the live consequence in the End-early modal so a host isn't ending
+  // a round out from under players who are mid-answer or before the reveal.
+  const endBody =
+    state.phase === "question" && outstanding > 0
+      ? `${outstanding} of ${players.length} players still answering. End the round now anyway? This can't be undone.`
+      : state.phase === "question"
+        ? `Question ${idx === null ? "" : idx + 1} is still open — players haven't seen the answer. End the round anyway? This can't be undone.`
+        : "End the quiz round now? This can't be undone.";
 
   return (
     <div className="flex flex-col gap-6">
@@ -104,8 +127,9 @@ export default function HostControlPanel({
           className="font-display font-semibold text-xs uppercase text-ink/60 px-2 py-1 border-2 border-ink"
           style={{ letterSpacing: "0.05em" }}
         >
-          {state.phase}
+          {PHASE_LABELS[state.phase]}
         </span>
+        <LiveBadge connected={connected} className="ml-auto" />
       </div>
 
       {error && <p className="font-body text-red text-sm">{error}</p>}
@@ -139,7 +163,7 @@ export default function HostControlPanel({
             className="bg-yellow text-ink font-display font-bold uppercase px-5 py-3 border-2 border-ink disabled:opacity-50"
             style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
           >
-            Start question 1 →
+            {busy ? "Starting…" : "Start question 1 →"}
           </button>
         )}
         {state.phase === "question" && (
@@ -150,7 +174,7 @@ export default function HostControlPanel({
             className="bg-yellow text-ink font-display font-bold uppercase px-5 py-3 border-2 border-ink disabled:opacity-50"
             style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
           >
-            Reveal answer ↓
+            {busy ? "Revealing…" : "Reveal answer ↓"}
           </button>
         )}
         {state.phase === "revealed" && !isLast && idx !== null && (
@@ -161,31 +185,33 @@ export default function HostControlPanel({
             className="bg-yellow text-ink font-display font-bold uppercase px-5 py-3 border-2 border-ink disabled:opacity-50"
             style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
           >
-            Next question →
+            {busy ? "Advancing…" : "Next question →"}
           </button>
         )}
         {state.phase === "revealed" && isLast && (
           <button
             type="button"
-            onClick={endGame}
+            onClick={() => setConfirmEnd(true)}
             disabled={busy}
             className="bg-yellow text-ink font-display font-bold uppercase px-5 py-3 border-2 border-ink disabled:opacity-50"
             style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
           >
-            Finish round
+            {busy ? "Finishing…" : "Finish round"}
           </button>
         )}
-        {state.phase !== "ended" && state.phase !== "lobby" && (
-          <button
-            type="button"
-            onClick={endGame}
-            disabled={busy}
-            className="border-2 border-red text-red font-display font-bold uppercase px-5 py-3"
-            style={{ letterSpacing: "0.05em" }}
-          >
-            End early
-          </button>
-        )}
+        {state.phase !== "ended" &&
+          state.phase !== "lobby" &&
+          !(state.phase === "revealed" && isLast) && (
+            <button
+              type="button"
+              onClick={() => setConfirmEnd(true)}
+              disabled={busy}
+              className="border-2 border-red text-red font-display font-bold uppercase px-5 py-3 disabled:opacity-50"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              End early
+            </button>
+          )}
       </div>
 
       {idx !== null && (
@@ -241,6 +267,18 @@ export default function HostControlPanel({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmEnd}
+        title="End round?"
+        body={endBody}
+        confirmLabel="End round"
+        cancelLabel="Keep going"
+        tone="danger"
+        busy={busy}
+        onConfirm={confirmEndGame}
+        onCancel={() => setConfirmEnd(false)}
+      />
     </div>
   );
 }

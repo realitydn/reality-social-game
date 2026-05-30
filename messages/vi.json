@@ -55,5 +55,14 @@
     "week": "Tuần này",
     "allTime": "Tất cả thời gian",
     "empty": "Chưa có điểm. Hãy đến chơi nhé."
+  },
+  "recap": {
+    "ended": "Đã kết thúc",
+    "noScores": "Tối nay chưa có điểm. Hẹn gặp lại.",
+    "catchNext": "Hẹn gặp lần sau."
+  },
+  "bigScreen": {
+    "scanToJoin": "Quét để tham gia",
+    "inTheRoom": "Trong phòng"
   }
 }
