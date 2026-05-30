@@ -15,8 +15,7 @@
     {
       "binding": "DB",
       "database_name": "socialgame-state",
-      // Run `wrangler d1 create socialgame-state` and paste the returned id here.
-      "database_id": "REPLACE_AFTER_WRANGLER_D1_CREATE",
+      "database_id": "95f6c9dd-6741-4be5-946c-39676a39f74c",
       "migrations_dir": "migrations"
     }
   ],
