@@ -99,7 +99,11 @@ export default function MultipleChoiceEditor({ questionId, data, onChange }: Pro
           />
         )}
         <label
-          className="border-2 border-ink px-3 py-2 font-display font-bold uppercase text-xs cursor-pointer hover:bg-yellow"
+          className={`border-2 border-ink px-3 py-2 font-display font-bold uppercase text-xs ${
+            uploading
+              ? "opacity-50 pointer-events-none cursor-default"
+              : "cursor-pointer hover:bg-yellow"
+          }`}
           style={{ letterSpacing: "0.05em" }}
         >
           {uploading ? "Uploading…" : data.image ? "Replace image" : "+ Image"}
@@ -107,6 +111,7 @@ export default function MultipleChoiceEditor({ questionId, data, onChange }: Pro
             type="file"
             accept="image/*"
             hidden
+            disabled={uploading}
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) void uploadStem(file);
@@ -130,6 +135,9 @@ export default function MultipleChoiceEditor({ questionId, data, onChange }: Pro
       <div className="flex flex-col gap-2">
         {data.options.map((opt, i) => {
           const isUploadingThis = uploadingOptionId === opt.id;
+          // Lock every option's picker while any one is uploading — the shared
+          // uploadingOptionId state can only track one upload at a time.
+          const optionUploadBusy = uploadingOptionId !== null;
           return (
             <div key={opt.id} className="border border-ink/20 p-2 flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -168,7 +176,13 @@ export default function MultipleChoiceEditor({ questionId, data, onChange }: Pro
                     className="h-12 w-12 object-cover border border-ink"
                   />
                 )}
-                <label className="font-body text-xs cursor-pointer underline text-ink/60 hover:text-ink">
+                <label
+                  className={`font-body text-xs underline ${
+                    optionUploadBusy
+                      ? "opacity-50 pointer-events-none cursor-default text-ink/40"
+                      : "cursor-pointer text-ink/60 hover:text-ink"
+                  }`}
+                >
                   {isUploadingThis
                     ? "Uploading…"
                     : opt.image
@@ -178,6 +192,7 @@ export default function MultipleChoiceEditor({ questionId, data, onChange }: Pro
                     type="file"
                     accept="image/*"
                     hidden
+                    disabled={optionUploadBusy}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) void uploadOptionImage(opt.id, file);

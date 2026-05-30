@@ -11,6 +11,11 @@ type Props = {
   onChange: (data: OrderingData) => void;
 };
 
+// ≥44px hit area (WCAG/Apple touch minimum) — these were ~28px and packed
+// tightly, hard to hit on the phones hosts actually author on.
+const ICON_BTN =
+  "min-w-[44px] min-h-[44px] flex items-center justify-center border-2 text-lg leading-none disabled:opacity-30";
+
 export default function OrderingEditor({ data, onChange }: Props) {
   const updateItem = (i: number, text: string) => {
     const items = data.items.map((it, idx) => (idx === i ? { ...it, text } : it));
@@ -64,13 +69,13 @@ export default function OrderingEditor({ data, onChange }: Props) {
               value={it.text}
               onChange={(e) => updateItem(i, e.target.value)}
               placeholder={`Item ${i + 1}`}
-              className="border-2 border-ink px-3 py-2 font-body text-base flex-1"
+              className="border-2 border-ink px-3 py-2 font-body text-base flex-1 min-w-0"
             />
             <button
               type="button"
               onClick={() => move(i, -1)}
               disabled={i === 0}
-              className="px-2 py-1 border-2 border-ink disabled:opacity-30"
+              className={`${ICON_BTN} border-ink`}
               aria-label="Move up"
             >
               ↑
@@ -79,7 +84,7 @@ export default function OrderingEditor({ data, onChange }: Props) {
               type="button"
               onClick={() => move(i, 1)}
               disabled={i === data.items.length - 1}
-              className="px-2 py-1 border-2 border-ink disabled:opacity-30"
+              className={`${ICON_BTN} border-ink`}
               aria-label="Move down"
             >
               ↓
@@ -88,7 +93,7 @@ export default function OrderingEditor({ data, onChange }: Props) {
               <button
                 type="button"
                 onClick={() => removeItem(i)}
-                className="text-red px-2"
+                className={`${ICON_BTN} border-red text-red ml-2`}
                 aria-label={`Remove item ${i + 1}`}
               >
                 ×

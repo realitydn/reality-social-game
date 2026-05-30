@@ -70,7 +70,11 @@ export default function FreeTextEditor({ data, onChange }: Props) {
           />
         )}
         <label
-          className="border-2 border-ink px-3 py-2 font-display font-bold uppercase text-xs cursor-pointer hover:bg-yellow"
+          className={`border-2 border-ink px-3 py-2 font-display font-bold uppercase text-xs ${
+            uploading
+              ? "opacity-50 pointer-events-none cursor-default"
+              : "cursor-pointer hover:bg-yellow"
+          }`}
           style={{ letterSpacing: "0.05em" }}
         >
           {uploading ? "Uploading…" : data.image ? "Replace image" : "+ Image"}
@@ -78,6 +82,7 @@ export default function FreeTextEditor({ data, onChange }: Props) {
             type="file"
             accept="image/*"
             hidden
+            disabled={uploading}
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) void uploadStem(file);

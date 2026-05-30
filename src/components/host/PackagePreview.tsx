@@ -10,6 +10,7 @@ import type { FreeTextData } from "@/games/quiz-round/question-types/free-text";
 import type { OrderingData } from "@/games/quiz-round/question-types/ordering";
 import type { AudioMCQData } from "@/games/quiz-round/question-types/audio-mcq";
 import { deterministicShuffle } from "@/games/quiz-round/question-types/lib/shuffle";
+import { labelFor } from "./QuestionEditor";
 
 export default function PackagePreview({ pkg }: { pkg: ParsedPackage }) {
   const questions =
@@ -51,7 +52,7 @@ export default function PackagePreview({ pkg }: { pkg: ParsedPackage }) {
         className="font-display font-semibold text-xs uppercase text-cream/60 mb-2"
         style={{ letterSpacing: "0.05em" }}
       >
-        Q{idx + 1} of {questions.length} · {q.type}
+        Q{idx + 1} of {questions.length} · {labelFor(q.type)}
       </div>
 
       <PreviewQuestionRenderer

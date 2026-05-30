@@ -68,7 +68,11 @@ export default function AudioMCQEditor({ questionId, data, onChange }: Props) {
 
       <div className="flex items-center gap-3 flex-wrap">
         <label
-          className="border-2 border-ink px-3 py-2 font-display font-bold uppercase text-xs cursor-pointer hover:bg-yellow"
+          className={`border-2 border-ink px-3 py-2 font-display font-bold uppercase text-xs ${
+            uploading
+              ? "opacity-50 pointer-events-none cursor-default"
+              : "cursor-pointer hover:bg-yellow"
+          }`}
           style={{ letterSpacing: "0.05em" }}
         >
           {uploading ? "Uploading…" : data.audioUrl ? "Replace audio" : "+ Audio (mp3 / m4a / ogg)"}
@@ -76,6 +80,7 @@ export default function AudioMCQEditor({ questionId, data, onChange }: Props) {
             type="file"
             accept="audio/*"
             hidden
+            disabled={uploading}
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) void uploadAudio(file);
