@@ -55,7 +55,11 @@
     "tonight": "Tối nay",
     "week": "Tuần này",
     "allTime": "Tất cả thời gian",
-    "empty": "Chưa có điểm. Hãy đến chơi nhé."
+    "empty": "Chưa có điểm. Hãy đến chơi nhé.",
+    "everything": "Tất cả",
+    "pubQuiz": "Đố vui",
+    "karaoke": "Karaoke",
+    "paparazzi": "Tay máy"
   },
   "recap": {
     "ended": "Đã kết thúc",

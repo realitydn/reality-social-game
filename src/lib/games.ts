@@ -5,6 +5,8 @@ import { listPlayers } from "./sessions";
 import { notifySession } from "./realtime";
 import { getGameType } from "@/games/registry";
 import type { GameType } from "@/games/types";
+import { recordLedger, type LedgerEntry } from "./ledger";
+import { tallyVotes, type DisposableCameraState } from "@/games/disposable-camera/state";
 
 export type GameRow = {
   id: string;
@@ -31,7 +33,13 @@ async function finalizeGame(game: GameRow): Promise<void> {
     .bind(Date.now(), game.id)
     .run();
   if (flip.meta.changes !== 1) return; // already finalized by a concurrent caller
-  const scores = await getScores(game);
+
+  const gt = getGameType(game.type);
+  const ctx = { gameId: game.id, sessionId: game.session_id };
+  const state = gt ? await getGameState(game) : null;
+  const scores = gt && state ? gt.score(state, ctx) : {};
+
+  // In-session cumulative — the recap reads session_players.score.
   for (const [userId, points] of Object.entries(scores)) {
     if (!points) continue;
     await db
@@ -41,6 +49,42 @@ async function finalizeGame(game: GameRow): Promise<void> {
       .bind(points, game.session_id, userId)
       .run();
   }
+
+  // Persistent ledger: per-game points power the overall + per-game-type boards.
+  const ledger: LedgerEntry[] = Object.entries(scores)
+    .filter(([, p]) => p)
+    .map(([userId, points]) => ({
+      userId,
+      sessionId: game.session_id,
+      gameId: game.id,
+      gameType: game.type,
+      points,
+      reason: "game",
+    }));
+
+  // Top Paparazzi: Disposable Camera is non-competitive in score(), so derive
+  // each photographer's points from the votes their photos received.
+  if (game.type === "disposable-camera" && state) {
+    const s = state as DisposableCameraState;
+    const perPhoto = tallyVotes(s);
+    const perPhotographer: Record<string, number> = {};
+    for (const photo of s.photos) {
+      const v = perPhoto.get(photo.id) ?? 0;
+      if (v) perPhotographer[photo.uploaderId] = (perPhotographer[photo.uploaderId] ?? 0) + v;
+    }
+    for (const [userId, points] of Object.entries(perPhotographer)) {
+      ledger.push({
+        userId,
+        sessionId: game.session_id,
+        gameId: game.id,
+        gameType: game.type,
+        points,
+        reason: "paparazzi",
+      });
+    }
+  }
+
+  await recordLedger(ledger);
 }
 
 export type StartGameOptions = {

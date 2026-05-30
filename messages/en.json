@@ -55,7 +55,11 @@
     "tonight": "Tonight",
     "week": "This week",
     "allTime": "All-time",
-    "empty": "No scores yet. Come play."
+    "empty": "No scores yet. Come play.",
+    "everything": "Everything",
+    "pubQuiz": "Pub Quiz",
+    "karaoke": "Karaoke",
+    "paparazzi": "Paparazzi"
   },
   "recap": {
     "ended": "Session ended",

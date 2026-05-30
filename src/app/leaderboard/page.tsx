@@ -1,10 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import {
-  allTimeLeaderboard,
-  tonightLeaderboard,
-  weekLeaderboard,
-  type LeaderboardEntry,
-} from "@/lib/leaderboards";
+import { getLeaderboard, type LeaderboardEntry, type LeaderboardWindow } from "@/lib/leaderboards";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import Wordmark from "@/components/Wordmark";
 
@@ -19,24 +14,31 @@ const SWATCH_BG = [
   "bg-green",
 ];
 
-type Tab = "tonight" | "week" | "all";
+const SCOPES = [
+  { key: "everything", gameType: undefined as string | undefined, labelKey: "everything" },
+  { key: "quiz-round", gameType: "quiz-round", labelKey: "pubQuiz" },
+  { key: "karaoke-queue", gameType: "karaoke-queue", labelKey: "karaoke" },
+  { key: "disposable-camera", gameType: "disposable-camera", labelKey: "paparazzi" },
+] as const;
+
+const WINDOWS: { key: LeaderboardWindow; labelKey: string }[] = [
+  { key: "tonight", labelKey: "tonight" },
+  { key: "week", labelKey: "week" },
+  { key: "all", labelKey: "allTime" },
+];
 
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; game?: string }>;
 }) {
   const params = await searchParams;
-  const tab: Tab =
+  const tab: LeaderboardWindow =
     params.tab === "week" ? "week" : params.tab === "all" ? "all" : "tonight";
+  const scope = SCOPES.find((s) => s.key === params.game) ?? SCOPES[0];
   const t = await getTranslations("leaderboard");
 
-  const entries =
-    tab === "tonight"
-      ? await tonightLeaderboard()
-      : tab === "week"
-        ? await weekLeaderboard()
-        : await allTimeLeaderboard();
+  const entries = await getLeaderboard(tab, scope.gameType);
 
   return (
     <main className="min-h-dvh flex flex-col">
@@ -52,12 +54,30 @@ export default async function LeaderboardPage({
         >
           {t("heading")}
         </h1>
-        <p className="font-body text-ink/60 text-sm mb-8">{t("subtitle")}</p>
+        <p className="font-body text-ink/60 text-sm mb-6">{t("subtitle")}</p>
 
+        {/* Game scope */}
+        <nav className="flex gap-2 mb-3 flex-wrap">
+          {SCOPES.map((s) => (
+            <PillLink
+              key={s.key}
+              href={`/leaderboard?tab=${tab}&game=${s.key}`}
+              active={s.key === scope.key}
+              label={t(s.labelKey)}
+            />
+          ))}
+        </nav>
+        {/* Time window */}
         <nav className="flex gap-2 mb-6 flex-wrap">
-          <TabLink current={tab} target="tonight" label={t("tonight")} />
-          <TabLink current={tab} target="week" label={t("week")} />
-          <TabLink current={tab} target="all" label={t("allTime")} />
+          {WINDOWS.map((w) => (
+            <PillLink
+              key={w.key}
+              href={`/leaderboard?tab=${w.key}&game=${scope.key}`}
+              active={w.key === tab}
+              label={t(w.labelKey)}
+              small
+            />
+          ))}
         </nav>
 
         {entries.length === 0 ? (
@@ -74,20 +94,21 @@ export default async function LeaderboardPage({
   );
 }
 
-function TabLink({
-  current,
-  target,
+function PillLink({
+  href,
+  active,
   label,
+  small = false,
 }: {
-  current: Tab;
-  target: Tab;
+  href: string;
+  active: boolean;
   label: string;
+  small?: boolean;
 }) {
-  const active = current === target;
   return (
     <a
-      href={`/leaderboard?tab=${target}`}
-      className={`font-display font-bold uppercase text-xs px-4 py-2 border-2 border-ink transition ${
+      href={href}
+      className={`font-display font-bold uppercase ${small ? "text-[11px] px-3 py-1.5" : "text-xs px-4 py-2"} border-2 border-ink transition ${
         active ? "bg-ink text-cream" : "bg-cream text-ink hover:bg-yellow"
       }`}
       style={{ letterSpacing: "0.05em" }}
