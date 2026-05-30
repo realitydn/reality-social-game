@@ -1,16 +1,17 @@
 /// <reference types="@cloudflare/workers-types" />
 
 // SessionRoom is a single-purpose Durable Object: one instance per game session,
-// holding nothing but the set of currently-connected client WebSockets, used as
-// a fan-out hub.
+// a fan-out hub that pings connected clients when something changes. The source
+// of truth stays in D1 — clients refetch /api/sessions/[id]/state on each ping —
+// so losing or replacing the DO costs nothing more than a brief reconnect.
 //
-// We deliberately keep it stateless beyond the connection set — the source of
-// truth stays in D1, and clients fetch fresh state from /api/sessions/[id]/state
-// when they receive a ping. The DO is just a notification channel; replacing it
-// or losing it costs us nothing more than a brief reconnect.
+// We use the WebSocket Hibernation API (acceptWebSocket / getWebSockets) rather
+// than holding sockets in an in-memory Set. The runtime owns the socket set and
+// can evict this DO from memory while a room is idle, so a quiet bar night costs
+// nothing — instead of billing wall-clock for every hour dozens of phones stay
+// connected — and the connections survive hibernation.
 export class SessionRoom implements DurableObject {
   private state: DurableObjectState;
-  private sockets = new Set<WebSocket>();
 
   constructor(state: DurableObjectState) {
     this.state = state;
@@ -26,32 +27,28 @@ export class SessionRoom implements DurableObject {
       }
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
-      server.accept();
-      this.sockets.add(server);
-
-      const cleanup = () => {
-        this.sockets.delete(server);
-      };
-      server.addEventListener("close", cleanup);
-      server.addEventListener("error", cleanup);
-
+      // Hand the server side to the runtime; it persists across hibernation.
+      this.state.acceptWebSocket(server);
       return new Response(null, { status: 101, webSocket: client });
     }
 
     if (url.pathname === "/broadcast" && req.method === "POST") {
       const body = await req.text();
-      const dead: WebSocket[] = [];
-      for (const ws of this.sockets) {
+      for (const ws of this.state.getWebSockets()) {
         try {
           ws.send(body);
         } catch {
-          dead.push(ws);
+          // Dead socket; the runtime reaps it from getWebSockets() on close.
         }
       }
-      for (const ws of dead) this.sockets.delete(ws);
       return new Response(null, { status: 204 });
     }
 
     return new Response("Not found", { status: 404 });
   }
+
+  // Clients never send messages — the room is a one-way fan-out — but the
+  // handler must exist so an unexpected inbound frame doesn't error the
+  // hibernating object. We simply ignore it.
+  async webSocketMessage(): Promise<void> {}
 }

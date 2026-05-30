@@ -48,3 +48,7 @@ next-env.d.ts
 # editor
 .vscode/
 .idea/
+
+# claude code local state (worktrees, session data). Commit specific config
+# with `git add -f .claude/<file>` if you ever want to share it.
+.claude/
