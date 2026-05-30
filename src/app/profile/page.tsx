@@ -1,24 +1,16 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { createGuest, getCurrentUser, updateProfile } from "@/lib/session";
+import { getCurrentUser, updateProfile } from "@/lib/session";
 import { LOCALES, LOCALE_LABELS, isLocale, type Locale } from "@/i18n/locales";
 import AvatarUpload from "@/components/AvatarUpload";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import Wordmark from "@/components/Wordmark";
 
-export default async function ProfilePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ guest?: string }>;
-}) {
-  const params = await searchParams;
-  let user = await getCurrentUser();
-
-  // Bootstrap a guest user if they came from the "Play as guest" path.
-  if (!user && params.guest === "1") {
-    user = await createGuest("Guest", "en");
-  }
-
+export default async function ProfilePage() {
+  // Guests are bootstrapped by the startGuestSession server action (which sets
+  // the guest cookie) BEFORE redirecting here — never during this render, since
+  // Next forbids cookie mutation during render.
+  const user = await getCurrentUser();
   if (!user) redirect("/");
 
   const t = await getTranslations("profile");
