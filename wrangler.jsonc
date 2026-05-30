@@ -50,5 +50,8 @@
   "routes": [
     { "pattern": "app.realitydn.com", "custom_domain": true }
   ],
+  // Keep the *.workers.dev URL live as a fallback (defining routes disables it
+  // by default). app.realitydn.com is the canonical address.
+  "workers_dev": true,
   "observability": { "enabled": true }
 }
