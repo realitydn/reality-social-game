@@ -35,9 +35,10 @@ What's playable today and how to add a new game.
 - **Mechanic:** Host-driven trivia round. The host opens questions one at a time from the host control panel; players answer on their phones (first answer wins, no overwrites); host reveals — close-question stops accepting answers and triggers per-player scoring; host advances to the next question. Optional auto-close timer is a hint to the player UI; the host can always reveal early or let it run past. Big-screen takes over the projector when the game type is `quiz-round`: question + options + live answer count + reveal coloring + inter-question leaderboard.
 - **Scoring:** Configurable per package. Default: 1000 points per correct answer with linear speed decay (full at 0ms, down to half at the timer mark). Materialized on reveal (one dramatic leaderboard jump per question), not per-answer. Late joiners can answer current and future questions; missed questions score zero.
 - **Content:** Loaded from a host-authored **package** (see `/host` CMS). Snapshotted into the `quiz_round_start` seed event at game start, so post-start edits to the source package don't affect the running game and replay stays deterministic.
-- **State shape:** `QuizRoundState` — frozen `questions[]`, `config`, `currentIdx`, `phase: lobby | question | revealed | ended`, `questionOpenedAt`, per-question `answers: { playerId → { value, elapsedMs, submittedAt } }`, `scores`, `reveals` log with per-player point deltas.
+- **State shape:** `QuizRoundState` — frozen `questions[]`, `config`, `currentIdx`, `phase: lobby | question | revealed | ended`, `questionOpenedAt`, per-question `answers: { playerId → { value, elapsedMs, submittedAt } }`, `scores`, `teams` / `playerTeam` (team play), `reveals` log with per-player point deltas.
 - **Seed events:** `quiz_round_start` carries the host id + question snapshot + config; emitted via `onStart()` from `seedData` passed by the admin server action (which resolves the package id from `games.config`).
-- **Note:** Host control surfaces at `/session/[id]/host`. The reducer enforces `state.hostId === actorId` for `quiz_round_open_question`, `quiz_round_close_question`, `quiz_round_advance`, and `quiz_round_end` — non-host players' attempts are rejected at the validate step. Server computes `elapsedMs` for answers from `state.questionOpenedAt` rather than trusting client-supplied timing.
+- **Teams (Pub Quiz mode):** Opt-in via a `teamsEnabled` config flag (a Teams checkbox on the quiz start form). When on, players create/join teams from a join/create step in the player view; the projector shows team standings (inter-question board + final podium) and each player sees "your team" + rank. Teams are **event-sourced, no new tables** — `quiz_create_team` / `quiz_join_team` events live in quiz state (`teams` + `playerTeam`). A team's standing is just the **sum of its members' individual scores** (`teamStandings()` in `state.ts`); individual scoring and the per-player/persistent leaderboards are completely unchanged underneath. Team events are rejected by `validate` when `teamsEnabled` is false.
+- **Note:** Host control surfaces at `/session/[id]/host`. The reducer enforces `state.hostId === actorId` for `quiz_round_open_question`, `quiz_round_close_question`, `quiz_round_advance`, and `quiz_round_end` — non-host players' attempts are rejected at the validate step. Server computes `elapsedMs` for answers from `state.questionOpenedAt` rather than trusting client-supplied timing. The host (or an admin) can also award off-script points via `POST /api/sessions/[id]/award` — a button in the host panel for marking quiz winners.
 - **Question types:** Pluggable. Ships with five:
   - `multiple-choice` — text + per-option images (Phase 10)
   - `true-false`
@@ -51,7 +52,7 @@ What's playable today and how to add a new game.
 - **Type key:** `karaoke-queue`
 - **Folder:** `src/games/karaoke-queue/`
 - **Mechanic:** First non-competitive game type. Players submit a song title (free text, one active per user); host arranges, edits, completes, or deletes from the queue at `/session/[id]/host`; big-screen displays "now up" + "up next" + a "recently performed" strip.
-- **Scoring:** None. `score()` returns `{}` — `finalizeGame()` becomes a no-op for this game type, so it doesn't pollute `session_players.score` or the persistent leaderboards.
+- **Scoring:** None from the game itself. `score()` returns `{}`, so `finalizeGame()` writes no `reason='game'` ledger rows and the queue doesn't pollute the boards. The host (or an admin) can still hand out discretionary points — "karaoke dares" — via `POST /api/sessions/[id]/award` from the host panel; those land in the ledger as `reason='karaoke_dare'`.
 - **State shape:** `KaraokeQueueState` — `queue` / `completed` / `removed` lists of `KaraokeRequest { id, playerId, songTitle, submittedAt }`, plus `started` / `ended` flags and `hostId`.
 - **Seed events:** `karaoke_start` carries the host id; emitted via `onStart()` from `seedData` passed by the admin server action (no content package needed).
 - **Note:** "One active request per user" is enforced both in `validate` (so the API rejects with a clear reason) and in the reducer (so replay stays correct under any hypothetical client races). Reorder is non-destructive — unknown ids are dropped, missing ids are appended, so the host can't accidentally lose items.
@@ -60,7 +61,7 @@ What's playable today and how to add a new game.
 - **Type key:** `disposable-camera`
 - **Folder:** `src/games/disposable-camera/`
 - **Mechanic:** Three-phase host-driven photo game. **Capturing** — each player gets up to N shots (host-configured, default 5) via their phone camera, direction set per-game (front / back / either); they can delete their own shots before voting opens. **Voting** — host opens voting; everyone sees the pooled grid and picks up to V favourites (host-configured, default 3); self-votes silently filtered. **Revealed** — top-voted shots take over the projector with photographer names + vote counts. **Ended** — frozen final podium.
-- **Scoring:** None — `score()` returns `{}` like Karaoke. The "Photographers of the Night" recognition is on the big-screen reveal, not in `session_players.score`, so persistent leaderboards aren't dominated by photo voting.
+- **Scoring:** `score()` returns `{}` like Karaoke, so it contributes no `reason='game'` points. But `finalizeGame()` special-cases this type: it tallies each photographer's received votes and writes them to the ledger as **`reason='paparazzi'`** rows, which feed the "Paparazzi" leaderboard tab. The in-the-moment "Photographers of the Night" reveal is still on the big screen; the ledger rows are what make Top Paparazzi persist across nights without letting photo voting dominate the everything-board.
 - **State shape:** `DisposableCameraState` — `config` (photos/camera/votes), `phase` (`capturing` | `voting` | `revealed` | `ended`), `photos: DisposablePhoto[]`, `votes: { voterId → photoIds[] }`. The `tallyVotes(state)` helper exports a pure vote-count map for big-screen + host panel.
 - **Seed events:** `disposable_start` carries `hostId` + `config`; emitted via `onStart()` from `seedData` passed by the admin server action's config form (photos / camera / votes inputs).
 - **Photo pipeline:** Reuses the Phase 7 photo pipeline with new `disposable` purpose. Client-side downscales to 2048px long-edge JPEG q=0.9 (typically 500KB-1.5MB) — practical "full res" for screen viewing, stays under the bumped 3MB Worker limit, no need for presigned PUTs. Switch to presigned later if archival-grade res ever becomes a goal.
@@ -70,9 +71,9 @@ What's playable today and how to add a new game.
 
 Three of the six game types — Quiz Round, Karaoke Queue, Disposable Camera — are *host-driven*: a designated user (typically the staff member or patron running the game) controls flow at runtime. The pattern generalizes:
 
-- The admin server action passes `{ hostId: user.id }` via `seedData` when starting one of these games (registry exports `HOST_DRIVEN_GAMES` so admin can do this generically). For games that also need pre-start config (Quiz Round picks a package, Disposable Camera picks photo / camera / vote knobs), `GAMES_WITH_CUSTOM_START_FORM` is the corresponding flag — admin renders a per-game form instead of the simple one-button start.
+- The admin start form has a **host picker** — a `<select>` of signed-in staff (`listStaffUsers()`), defaulting to the admin themselves. The chosen `user.id` is passed as `{ hostId }` via `seedData` (registry exports `HOST_DRIVEN_GAMES` so admin can do this generically). This is how a non-admin `host`-role staffer — Sam on Pub Quiz — gets handed control of one game without full admin rights. For games that also need pre-start config (Quiz Round picks a package, Disposable Camera picks photo / camera / vote knobs), `GAMES_WITH_CUSTOM_START_FORM` is the corresponding flag — admin renders a per-game form instead of the simple one-button start.
 - The GameType's `onStart` reads `seedData.hostId` (and any other config) and emits a seed event that captures it into state.
-- The reducer enforces `state.hostId === actorId` for any host-only event in its `validate` step.
+- The reducer enforces `state.hostId === actorId` for any host-only event in its `validate` step. The same host id authorizes that user (without admin) to award points via `POST /api/sessions/[id]/award`.
 - Admin shows a "Host control →" button to `/session/[id]/host` when a host-driven game is running. That route dispatches by `game.type` to the right control panel component.
 
 Adding a new host-driven game = the GameType reads `seedData.hostId` in `onStart` + the host route adds a render branch for the new type.
@@ -81,11 +82,11 @@ Adding a new host-driven game = the GameType reads `seedData.hostId` in `onStart
 
 Every game gets the same projector treatment for free:
 
-- `Leaderboard` component reads `gameType.score(state)` via `/api/sessions/[id]/state`, sorts, displays top-5 in REALITY chromatic swatches
-- `AttendeeList` shows live player roster with codes
+- The in-session `Leaderboard` component reads `gameType.score(state)` via `/api/sessions/[id]/state`, sorts, displays top-5 in REALITY chromatic swatches
+- `AttendeeList` shows live player roster with codes and avatars
 - End-of-session recap (when `session.ends_at` is set) reads `session_players.score` for the final podium
 
-`session_players.score` is populated by `finalizeGame()` (in `src/lib/games.ts`) when a game ends — it adds the GameType's final score map to the persistent column. So persistent leaderboards (`/leaderboard?tab=tonight|week|all`) work uniformly across game types.
+`finalizeGame()` (in `src/lib/games.ts`) does the persisting when a game ends. It writes to two stores: `session_players.score` (the in-session cumulative the recap reads) and the append-only `score_ledger` (per-game `reason='game'` rows, plus the `reason='paparazzi'` tally for Disposable Camera). The persistent `/leaderboard` reads the **ledger**, so it can offer game-scope tabs (Everything / Pub Quiz / Karaoke / Paparazzi) × time windows (tonight / week / all) — see [docs/ARCHITECTURE.md → Score ledger](ARCHITECTURE.md#score-ledger--leaderboards). Host-awarded points (quiz winners, karaoke dares) land in the same ledger.
 
 ## How to add a new game
 

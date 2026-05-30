@@ -33,7 +33,7 @@ npx wrangler d1 create socialgame-state
 
 Wrangler returns a UUID. Open `wrangler.jsonc` and paste it into `d1_databases[0].database_id`, replacing `REPLACE_AFTER_WRANGLER_D1_CREATE`.
 
-Apply migrations locally and remotely:
+Apply migrations locally and remotely (the repo currently ships `0000`–`0005`):
 
 ```bash
 npm run db:apply:local
@@ -64,11 +64,13 @@ The full URL (e.g. `https://photos.realitydn.com`) is what goes into `PHOTOS_BAS
 2. Create an OAuth 2.0 Client ID, type **Web application**
 3. Add authorized JavaScript origins:
    - `http://localhost:3000` (for `next dev`)
-   - Your production domain
+   - `https://app.realitydn.com` (the production custom domain)
 4. Add authorized redirect URIs:
    - `http://localhost:3000/api/auth/callback/google`
-   - `https://<your-domain>/api/auth/callback/google`
+   - `https://app.realitydn.com/api/auth/callback/google`
 5. Note the Client ID and Client Secret
+
+> The redirect URI must match the host the app is actually served on. We run on the custom domain, so it's `app.realitydn.com` — **not** the `*.workers.dev` fallback. A mismatch here is the usual cause of a `configuration` error on sign-in.
 
 ## 6. Local environment
 
@@ -87,7 +89,7 @@ ADMIN_EMAILS=<your email here>
 PHOTOS_BASE_URL=https://photos.realitydn.com   # or whatever your custom domain is
 ```
 
-`ADMIN_EMAILS` is a comma-separated list. Anyone signed in with a Google account whose email is on the list can access `/admin/*`.
+`ADMIN_EMAILS` is a comma-separated list — now a **bootstrap admin seed**, not the whole story. Anyone on it is always an admin (so you can't lock yourself out of an empty `staff_roles` table). Once you're in, manage everyone else from the `/admin/staff` page: add staff by email and set each to `admin` or `host`. `host`-role staff can run host-driven games and award points without full admin. Roles are keyed by email, so you can pre-authorize someone (e.g. Sam for Pub Quiz) before they've ever signed in.
 
 ## 7. Run locally
 
@@ -107,8 +109,8 @@ For the deployed Worker, secrets are set via `wrangler secret put` — they don'
 npx wrangler secret put AUTH_SECRET
 npx wrangler secret put AUTH_GOOGLE_ID
 npx wrangler secret put AUTH_GOOGLE_SECRET
-npx wrangler secret put APP_URL                 # your production URL
-npx wrangler secret put ADMIN_EMAILS
+npx wrangler secret put APP_URL                 # https://app.realitydn.com
+npx wrangler secret put ADMIN_EMAILS            # bootstrap admin seed (see step 6)
 npx wrangler secret put PHOTOS_BASE_URL
 # When wired:
 # npx wrangler secret put RESEND_API_KEY
@@ -131,29 +133,43 @@ opennextjs-cloudflare build && opennextjs-cloudflare deploy
 
 Which generates `.open-next/worker.js`, then bundles `worker.ts` (which wraps it + exports `SessionRoom` + intercepts `/api/sessions/<id>/ws`), then uploads to Cloudflare via wrangler.
 
+### Custom domain
+
+The app is served from `app.realitydn.com`. This is configured declaratively in `wrangler.jsonc`:
+
+```jsonc
+"routes": [
+  { "pattern": "app.realitydn.com", "custom_domain": true }
+],
+"workers_dev": true   // keep the *.workers.dev URL as a fallback
+```
+
+Because `realitydn.com` is a zone on the same Cloudflare account, `wrangler deploy` provisions the DNS record and TLS cert automatically — no manual DNS step. Defining `routes` would normally disable the `*.workers.dev` URL, so `workers_dev: true` keeps it live alongside as a fallback. Auth.js needs `trustHost: true` (already set in `src/lib/auth.ts`) for sign-in to work behind Cloudflare's proxy on the custom domain. Point `APP_URL` and the Google redirect URI at `app.realitydn.com`, not the `*.workers.dev` URL.
+
 ## 10. Post-deploy verification
 
 Walk through the night cycle in production:
 
 1. Sign in with a Google account on the `ADMIN_EMAILS` list
-2. Visit `/admin/session/new` → create a session
-3. Open the big screen view (link from admin panel) on a TV / laptop / phone
-4. Scan the QR with another phone → guest signup → join
-5. Start Bingo from the admin panel
-6. On the player phone, tap a square → enter the staff phone's 4-char code → confirm
-7. Watch the leaderboard update on the big screen
+2. (Optional) Visit `/admin/staff` → add any other staff by email and set them `admin` or `host`
+3. Visit `/admin/session/new` → create a session
+4. Open the big screen view (link from admin panel) on a TV / laptop / phone
+5. Scan the QR with another phone → guest signup → join
+6. Start Bingo from the admin panel
+7. On the player phone, tap a square → enter the staff phone's 4-char code → confirm
+8. Watch the leaderboard update on the big screen
 
 If realtime works (WS connected), updates are sub-second. If only polling, ~5s.
 
-End the session and confirm the recap splash appears.
+End the session and confirm the recap splash appears. To exercise the rest of the batch: start a Quiz Round with the **Teams** checkbox and a non-admin `host` picked, award a point from the host panel, and check the game-scope tabs at `/leaderboard`.
 
 ## Common pitfalls
 
 - **`Property 'DB' does not exist on type 'CloudflareEnv'`** — run `npm run cf-typegen` after editing `wrangler.jsonc` bindings, OR check that `cloudflare-env.d.ts` augmentations are committed.
 - **WebSocket connection fails locally** — expected under `next dev`. Use `npm run preview` for DO support locally.
 - **Photos upload returns 503** — `PHOTOS_BASE_URL` env var isn't set, or R2 bucket isn't bound. Check `wrangler.jsonc` and `wrangler secret list`.
-- **Sign in returns "configuration"** — `AUTH_SECRET` not set, or Google redirect URI doesn't match exactly. Check both ends.
-- **Admin gate redirects you home** — your email isn't in `ADMIN_EMAILS`, or you're signed in as a guest (admin requires Google).
+- **Sign in returns "configuration"** — `AUTH_SECRET` not set, or the Google redirect URI doesn't match exactly. On the custom domain it must be `https://app.realitydn.com/api/auth/callback/google`, and `trustHost: true` must be set in `src/lib/auth.ts` (it is). Check both ends.
+- **Admin gate redirects you home** — your email has no `admin` role: it's neither in `ADMIN_EMAILS` (the bootstrap seed) nor set to `admin` in `staff_roles`. Or you're signed in as a guest (admin requires Google). `host`-role staff are also redirected from `/admin/*` — they don't get the admin panel, only the per-game host control surfaced when an admin assigns them.
 - **DO migration warning during `next build`** — expected. The DO is bundled into the deployed Worker (via `worker.ts`), not into the `next build` output. Production deploys include it.
 
 ## Updating after schema or binding changes

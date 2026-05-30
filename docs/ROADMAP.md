@@ -18,6 +18,8 @@ Where this app might go, organized by how much it costs to get there. Shipped ph
 | 9 | Karaoke Queue (first non-competitive game; free-text submissions, host CRUDs the queue, big-screen now-up + up-next + history strip) | host-driven game pattern generalized via `HOST_DRIVEN_GAMES` |
 | 10 | Quiz Round question types: free-text (Levenshtein) + ordering (drag-and-drop) + audio-MCQ (R2-hosted clips) + per-option images for MCQ | photo upload pipeline extended to audio MIME types; deterministic per-player shuffle util |
 | 11 | Disposable Camera (host-configured photo capture + audience voting + projector reveal); host start-form pattern (`GAMES_WITH_CUSTOM_START_FORM`) | second non-competitive game; client-side 2048px downscale + bumped Worker image limit |
+| 12 | **Custom domain** (`app.realitydn.com`) + **staff roles** (`staff_roles` table: admin/host, `/admin/staff` manager, host picker on start) + **score ledger** (append-only; per-game-type + everything leaderboard tabs × time windows) + **host-awarded points** (`/award`: quiz winners, karaoke dares, auto Top Paparazzi) + **Pub Quiz teams** (event-sourced, team standings on the projector) | role-based admin replaces the env gate; ledger replaces score-from-`session_players`; `trustHost` for the proxied domain |
+| 13 | **Security + UX hardening** | event-route participant/host auth (closed a cross-session IDOR), zod-validated event bodies, rowid-ordered replay, compare-and-swap `finalizeGame`; DO on the WebSocket Hibernation API; ConfirmModal, Live/Reconnecting badge, projector legibility, CMS lost-work guard, auth-aware home + real sign-out, player avatars; fixes — Google sign-in (users timestamps default), guest "Play as guest" 500, R2 immutable cache + avatar pruning |
 
 ## Tier 1 — drop-in games (~1 weekend each)
 
@@ -105,8 +107,8 @@ Listed so we don't lose track:
 - **Rate limiting** on event POSTs and joins. KV-based per-IP counter; stop a motivated griefer from spamming claims. ~Half a day.
 - **Block / report** — table + admin queue UI. Half a day. Build when first abuse is seen.
 - **Score snapshots** — when reducer-from-events gets slow, store materialized state in `games.state_snapshot` and only re-reduce events newer than the snapshot. Quiz Round games with N players × N questions × ~3 events each can hit several thousand events per game.
-- **Auth.js D1 adapter schema verification** — flagged in `migrations/0000_init.sql`. Verify the schema matches the installed adapter version before first sign-in attempt in production.
-- **Real role-based admin** — replace the `ADMIN_EMAILS` env var soft gate with a `roles` table. Likely arrives alongside Membership. Will also formalize the `/host/*` allowlist (currently any signed-in user).
+- **Auth.js D1 adapter schema verification** — was flagged in `migrations/0000_init.sql`. `migrations/0004` fixed the concrete bite (the adapter's `createUser` omits `created_at`/`updated_at`, so those columns now `DEFAULT 0`). Re-verify if the adapter version bumps.
+- **Host CMS access control** — role-based admin shipped (Phase 12: `staff_roles`, `isAdmin`/`isHost`), but the `/host/*` package CMS is still open to any signed-in user (obscurity model). Gating it behind `isHost` is the remaining piece.
 - **Better dev experience** — `next dev` doesn't support DOs, so realtime and photo upload break locally. Either:
   - Add a `wrangler dev` workflow alongside, OR
   - Add a dev-only mock adapter that fakes WS + R2 against in-memory state.
@@ -122,3 +124,7 @@ Threading through these for context:
 - **No path-based i18n routing** — cookie-based locale, shorter URLs, no auth/cache complications. Adopt path-based if SEO becomes a goal (it isn't).
 - **D1 over Postgres** — matches the existing REALITY ecosystem pattern (sidework, planned Membership). No Hyperdrive, no Neon.
 - **R2 over Cloudinary** for new uploads — Donald is consolidating onto Cloudflare. Cloudinary stays for sidework's existing usage.
+- **Append-only ledger over a running total** for persistent scores (Phase 12) — same reasoning as event-sourcing the games: attributable points, re-derivable boards, and slice-by-game-type / time-window without a schema change. `session_players.score` stays as the cheap in-session cumulative.
+- **Roles keyed by email, with `ADMIN_EMAILS` as a bootstrap seed** (Phase 12) — emails let us pre-authorize staff before they sign in, and the seed means an empty `staff_roles` table can't lock everyone out. Admin server actions self-authorize because a layout gate doesn't protect a public POST endpoint.
+- **Custom domain via wrangler `routes` + `trustHost`** (Phase 12) — `app.realitydn.com` is canonical; the `*.workers.dev` URL stays as a fallback. Behind Cloudflare's proxy, Auth.js v5 needs `trustHost` or it rejects the host header.
+- **WebSocket Hibernation API** for the SessionRoom DO (Phase 13) — idle rooms get evicted from memory instead of billing wall-clock while dozens of phones idle on a quiet night. The runtime-owned socket set also survives hibernation.
