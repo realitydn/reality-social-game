@@ -5,6 +5,7 @@ import {
   getPhotosBaseUrl,
   getPhotosBucket,
   isAllowedPurpose,
+  pruneOldAvatars,
   publicUrlFor,
   recordPhoto,
   setUserAvatar,
@@ -63,7 +64,12 @@ export async function POST(req: NextRequest) {
 
   const bytes = await file.arrayBuffer();
   await bucket.put(r2Key, bytes, {
-    httpMetadata: { contentType: file.type },
+    // Keys are content-addressed (UUID), so an object never changes under a
+    // given key — safe to cache aggressively at the CDN/custom-domain edge.
+    httpMetadata: {
+      contentType: file.type,
+      cacheControl: "public, max-age=31536000, immutable",
+    },
     customMetadata: { uploadedBy: user.id, purpose },
   });
 
@@ -83,6 +89,13 @@ export async function POST(req: NextRequest) {
   const url = publicUrlFor(baseUrl, r2Key);
   if (purpose === "avatar") {
     await setUserAvatar(user.id, url);
+    // Best-effort: clean up the user's previous avatar object(s) so R2 doesn't
+    // accumulate orphans. A cleanup failure must not fail the upload.
+    try {
+      await pruneOldAvatars(bucket, user.id, photoId);
+    } catch {
+      /* leave orphans rather than 500 a successful upload */
+    }
   }
 
   return NextResponse.json({ ok: true, id: photoId, url });

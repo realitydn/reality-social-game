@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SessionPlayer } from "@/lib/sessions";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
+import PlayerAvatar from "@/components/PlayerAvatar";
 
 type Props = {
   sessionId: string;
@@ -43,11 +44,16 @@ export default function AttendeeList({
         {players.map((p) => (
           <div
             key={p.user_id}
-            className="bg-cream text-ink p-3 font-display font-semibold text-sm uppercase truncate"
-            style={{ letterSpacing: "0.05em" }}
+            className="bg-cream text-ink p-3 flex items-center gap-2 min-w-0"
             title={p.display_name}
           >
-            {p.display_name}
+            <PlayerAvatar url={p.avatar_url} name={p.display_name} size={28} />
+            <span
+              className="font-display font-semibold text-sm uppercase truncate"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {p.display_name}
+            </span>
           </div>
         ))}
         {players.length === 0 && (
@@ -64,12 +70,18 @@ export default function AttendeeList({
       {players.map((p) => (
         <li
           key={p.user_id}
-          className="flex items-center justify-between border-2 border-ink px-4 py-2 font-body"
+          className="flex items-center justify-between border-2 border-ink px-4 py-2 font-body gap-3"
         >
-          <span className="font-display font-semibold uppercase" style={{ letterSpacing: "0.05em" }}>
-            {p.display_name}
+          <span className="flex items-center gap-3 min-w-0">
+            <PlayerAvatar url={p.avatar_url} name={p.display_name} size={32} />
+            <span
+              className="font-display font-semibold uppercase truncate"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {p.display_name}
+            </span>
           </span>
-          {p.is_guest && <span className="text-xs text-ink/50">guest</span>}
+          {p.is_guest && <span className="text-xs text-ink/50 shrink-0">guest</span>}
         </li>
       ))}
       {players.length === 0 && (

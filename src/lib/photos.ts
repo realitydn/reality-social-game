@@ -147,3 +147,27 @@ export async function setUserAvatar(userId: string, url: string): Promise<void> 
     .bind(url, Date.now(), userId)
     .run();
 }
+
+// Avatars are "latest wins": each upload gets a fresh UUID key, so the previous
+// R2 object + photos row would otherwise leak forever. Delete all of a user's
+// prior avatars, keeping only the one just uploaded. Best-effort per object.
+export async function pruneOldAvatars(
+  bucket: R2Bucket,
+  userId: string,
+  keepPhotoId: string,
+): Promise<void> {
+  const db = await getDB();
+  const old = await db
+    .prepare(
+      "SELECT id, r2_key FROM photos WHERE user_id = ? AND purpose = 'avatar' AND id != ?",
+    )
+    .bind(userId, keepPhotoId)
+    .all<{ id: string; r2_key: string }>();
+  const rows = old.results ?? [];
+  if (rows.length === 0) return;
+  await Promise.all(rows.map((r) => bucket.delete(r.r2_key).catch(() => {})));
+  await db
+    .prepare("DELETE FROM photos WHERE user_id = ? AND purpose = 'avatar' AND id != ?")
+    .bind(userId, keepPhotoId)
+    .run();
+}

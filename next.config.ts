@@ -7,8 +7,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
     remotePatterns: [
-      // R2 custom domain for user-uploaded avatars (enable when R2 is provisioned)
-      // { protocol: "https", hostname: "images.realitydn.com" },
+      // Only needed if we switch avatars/photos to next/image. Today they render
+      // via plain <img> (see PlayerAvatar / AvatarUpload), so this stays off.
+      // Hostname must match the R2 custom domain in wrangler.jsonc / PHOTOS_BASE_URL.
+      // { protocol: "https", hostname: "photos.realitydn.com" },
     ],
   },
 };

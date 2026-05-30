@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SessionPlayer } from "@/lib/sessions";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
+import PlayerAvatar from "@/components/PlayerAvatar";
 
 type Dashboard = {
   game: { id: string; type: string; status: string } | null;
@@ -69,15 +70,18 @@ export default function Leaderboard({ sessionId, initial, pollMs = 5000, topN = 
       {ranked.map((r, i) => (
         <div
           key={r.player.user_id}
-          className={`flex items-center justify-between p-3 ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
+          className={`flex items-center justify-between gap-3 p-3 ${SWATCH_BG[i % SWATCH_BG.length]} text-ink`}
         >
-          <span
-            className="font-display font-bold text-2xl uppercase truncate"
-            style={{ letterSpacing: "0.05em" }}
-          >
-            {i + 1}. {r.player.display_name}
+          <span className="flex items-center gap-3 min-w-0">
+            <PlayerAvatar url={r.player.avatar_url} name={r.player.display_name} size={40} />
+            <span
+              className="font-display font-bold text-2xl uppercase truncate"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {i + 1}. {r.player.display_name}
+            </span>
           </span>
-          <span className="font-display font-bold text-2xl">{r.score}</span>
+          <span className="font-display font-bold text-2xl shrink-0">{r.score}</span>
         </div>
       ))}
     </div>
