@@ -8,6 +8,7 @@ import { appendEvent } from "@/lib/events";
 import { notifySession } from "@/lib/realtime";
 import { getGameType } from "@/games/registry";
 import { promptIdAt } from "@/games/bingo/card";
+import { getPhotosBaseUrl } from "@/lib/photos";
 import type { BingoEvent, BingoState } from "@/games/bingo/state";
 import type { TargetHuntEvent, TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairEvent, SpeedPairState } from "@/games/speed-pair/state";
@@ -489,6 +490,12 @@ export async function POST(
   // ───────────── Disposable Camera ─────────────
   if (body.kind === "disposable_photo_upload") {
     const state = (await getGameState(game)) as DisposableCameraState;
+    // The url is client-supplied; require it to be one our R2 pipeline actually
+    // produced (under PHOTOS_BASE_URL) so a client can't attach an arbitrary
+    // external image to the projector slideshow.
+    const photosBase = await getPhotosBaseUrl();
+    if (!photosBase || !body.url.startsWith(photosBase))
+      return NextResponse.json({ error: "invalid photo url" }, { status: 400 });
     const event: DisposableEvent = {
       kind: "disposable_photo_upload",
       id: body.photoId,
