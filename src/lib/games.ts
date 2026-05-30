@@ -22,9 +22,17 @@ export type GameRow = {
 // (the previous running game gets finalized first).
 async function finalizeGame(game: GameRow): Promise<void> {
   const db = await getDB();
+  // Compare-and-swap the status FIRST. Only the caller that actually flips
+  // running→ended applies the score deltas. Previously scores were added before
+  // the flip, so two racing finalizes (a double-tapped "end", or "end" racing
+  // the auto-finalize when the next game starts) both credited the same points.
+  const flip = await db
+    .prepare("UPDATE games SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'running'")
+    .bind(Date.now(), game.id)
+    .run();
+  if (flip.meta.changes !== 1) return; // already finalized by a concurrent caller
   const scores = await getScores(game);
-  const entries = Object.entries(scores);
-  for (const [userId, points] of entries) {
+  for (const [userId, points] of Object.entries(scores)) {
     if (!points) continue;
     await db
       .prepare(
@@ -33,10 +41,6 @@ async function finalizeGame(game: GameRow): Promise<void> {
       .bind(points, game.session_id, userId)
       .run();
   }
-  await db
-    .prepare("UPDATE games SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'running'")
-    .bind(Date.now(), game.id)
-    .run();
 }
 
 export type StartGameOptions = {
@@ -59,6 +63,17 @@ export async function startGame(
   if (!gt) throw new Error(`Unknown game type: ${type}`);
   const db = await getDB();
 
+  // Games that are unplayable below a floor of participants. Checked before we
+  // finalize the prior game, so a rejected start doesn't tear down what's
+  // running. Host-driven games (quiz/karaoke/disposable) intentionally have no
+  // minimum — players trickle in after the host opens them.
+  const MIN_PLAYERS: Record<string, number> = { "speed-pair": 2, "target-hunt": 2 };
+  const minPlayers = MIN_PLAYERS[type] ?? 0;
+  // Load the roster once if either the minimum check or onStart needs it.
+  const roster = minPlayers > 0 || gt.onStart ? await listPlayers(sessionId) : null;
+  if (minPlayers > 0 && (roster?.length ?? 0) < minPlayers)
+    throw new Error(`${type} needs at least ${minPlayers} players to start.`);
+
   // Finalize any currently-running game in this session (persists its scores).
   const prior = await getActiveGame(sessionId);
   if (prior) await finalizeGame(prior);
@@ -77,7 +92,7 @@ export async function startGame(
   // Optional onStart hook: seed events that depend on the current roster
   // and/or upstream data passed in via seedData.
   if (gt.onStart) {
-    const players = await listPlayers(sessionId);
+    const players = roster ?? (await listPlayers(sessionId));
     const seedEvents = gt.onStart(
       { gameId: id, sessionId },
       players.map((p) => p.user_id),

@@ -53,13 +53,20 @@ async function leaderboard(
   }));
 }
 
+// Đà Nẵng is UTC+7 year-round (no DST). Workers run in UTC, so we compute the
+// "tonight" boundary in ICT explicitly rather than via Date.setHours (which
+// would anchor to the Worker's UTC clock — 14:00 UTC is 21:00 in Đà Nẵng, so an
+// early-evening session wouldn't count as "tonight" until 9pm local).
+const ICT_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 export async function tonightLeaderboard(limit = 20): Promise<LeaderboardEntry[]> {
-  // Tonight = sessions that started after local 14:00 today (covers a typical bar night).
-  const now = new Date();
-  const cutoff = new Date(now);
-  cutoff.setHours(14, 0, 0, 0);
-  if (cutoff.getTime() > now.getTime()) cutoff.setDate(cutoff.getDate() - 1);
-  return leaderboard(cutoff.getTime(), true, limit);
+  // Tonight = sessions started since 14:00 ICT today (covers a typical bar night).
+  const nowMs = Date.now();
+  const ictNow = nowMs + ICT_OFFSET_MS; // shift into ICT wall-clock
+  const ictMidnight = Math.floor(ictNow / DAY) * DAY; // 00:00 ICT (shifted ms)
+  let cutoffIct = ictMidnight + 14 * 60 * 60 * 1000; // 14:00 ICT
+  if (cutoffIct > ictNow) cutoffIct -= DAY; // before 14:00 ICT → use yesterday's
+  return leaderboard(cutoffIct - ICT_OFFSET_MS, true, limit); // back to UTC epoch
 }
 
 export async function weekLeaderboard(limit = 20): Promise<LeaderboardEntry[]> {

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getCurrentUser } from "@/lib/session";
 import { getGame, getGameState } from "@/lib/games";
-import { findPlayerByCode } from "@/lib/sessions";
+import { findPlayerByCode, getPlayer } from "@/lib/sessions";
+import { isAdminEmail } from "@/lib/admin";
 import { appendEvent } from "@/lib/events";
 import { notifySession } from "@/lib/realtime";
 import { getGameType } from "@/games/registry";
@@ -16,63 +18,46 @@ import type {
   DisposableEvent,
 } from "@/games/disposable-camera/state";
 
-type BingoClaimBody = {
-  kind: "bingo_claim";
-  squareIdx: number;
-  promptId: string;
-  targetCode: string;
-};
-type BingoResolveBody = { kind: "bingo_confirm" | "bingo_deny"; claimId: string };
-type TagClaimBody = { kind: "target_hunt_tag_claim" };
-type TagResolveBody = {
-  kind: "target_hunt_tag_confirm" | "target_hunt_tag_deny";
-  claimId: string;
-};
-type SpeedPairDoneBody = { kind: "speed_pair_done" };
-type QuizOpenBody = { kind: "quiz_round_open_question"; questionIdx: number };
-type QuizAnswerBody = { kind: "quiz_round_answer"; value: unknown };
-type QuizCloseBody = { kind: "quiz_round_close_question" };
-type QuizAdvanceBody = { kind: "quiz_round_advance"; nextIdx: number };
-type QuizEndBody = { kind: "quiz_round_end" };
-type KaraokeSubmitBody = { kind: "karaoke_submit"; songTitle: string };
-type KaraokeEditBody = { kind: "karaoke_edit"; requestId: string; songTitle: string };
-type KaraokeReorderBody = { kind: "karaoke_reorder"; orderedIds: string[] };
-type KaraokeCompleteBody = { kind: "karaoke_complete"; requestId: string };
-type KaraokeDeleteBody = { kind: "karaoke_delete"; requestId: string };
-type KaraokeEndBody = { kind: "karaoke_end" };
-type DisposableUploadBody = {
-  kind: "disposable_photo_upload";
-  photoId: string;
-  url: string;
-};
-type DisposableDeleteBody = { kind: "disposable_photo_delete"; photoId: string };
-type DisposableOpenVotingBody = { kind: "disposable_open_voting" };
-type DisposableVoteBody = { kind: "disposable_vote"; photoIds: string[] };
-type DisposableOpenRevealBody = { kind: "disposable_open_reveal" };
-type DisposableEndBody = { kind: "disposable_end" };
-type EventBody =
-  | BingoClaimBody
-  | BingoResolveBody
-  | TagClaimBody
-  | TagResolveBody
-  | SpeedPairDoneBody
-  | QuizOpenBody
-  | QuizAnswerBody
-  | QuizCloseBody
-  | QuizAdvanceBody
-  | QuizEndBody
-  | KaraokeSubmitBody
-  | KaraokeEditBody
-  | KaraokeReorderBody
-  | KaraokeCompleteBody
-  | KaraokeDeleteBody
-  | KaraokeEndBody
-  | DisposableUploadBody
-  | DisposableDeleteBody
-  | DisposableOpenVotingBody
-  | DisposableVoteBody
-  | DisposableOpenRevealBody
-  | DisposableEndBody;
+// Runtime validation for every event body. Casting untrusted JSON straight to a
+// type (the old approach) let malformed or out-of-range payloads — string/NaN
+// square indexes, multi-megabyte strings — reach the reducer and the database.
+// zod was already a dependency; it just wasn't used here.
+const str = (max: number) => z.string().min(1).max(max);
+const idx = z.number().int().min(0).max(1000);
+
+const EventSchema = z.discriminatedUnion("kind", [
+  // Bingo
+  z.object({ kind: z.literal("bingo_claim"), squareIdx: z.number().int().min(0).max(15), promptId: str(64), targetCode: str(16) }),
+  z.object({ kind: z.literal("bingo_confirm"), claimId: str(64) }),
+  z.object({ kind: z.literal("bingo_deny"), claimId: str(64) }),
+  // Target Hunt
+  z.object({ kind: z.literal("target_hunt_tag_claim") }),
+  z.object({ kind: z.literal("target_hunt_tag_confirm"), claimId: str(64) }),
+  z.object({ kind: z.literal("target_hunt_tag_deny"), claimId: str(64) }),
+  // Speed Pair
+  z.object({ kind: z.literal("speed_pair_done") }),
+  // Quiz Round
+  z.object({ kind: z.literal("quiz_round_open_question"), questionIdx: idx }),
+  z.object({ kind: z.literal("quiz_round_answer"), value: z.unknown() }),
+  z.object({ kind: z.literal("quiz_round_close_question") }),
+  z.object({ kind: z.literal("quiz_round_advance"), nextIdx: idx }),
+  z.object({ kind: z.literal("quiz_round_end") }),
+  // Karaoke Queue
+  z.object({ kind: z.literal("karaoke_submit"), songTitle: str(200) }),
+  z.object({ kind: z.literal("karaoke_edit"), requestId: str(64), songTitle: str(200) }),
+  z.object({ kind: z.literal("karaoke_reorder"), orderedIds: z.array(str(64)).max(500) }),
+  z.object({ kind: z.literal("karaoke_complete"), requestId: str(64) }),
+  z.object({ kind: z.literal("karaoke_delete"), requestId: str(64) }),
+  z.object({ kind: z.literal("karaoke_end") }),
+  // Disposable Camera
+  z.object({ kind: z.literal("disposable_photo_upload"), photoId: str(64), url: str(1000) }),
+  z.object({ kind: z.literal("disposable_photo_delete"), photoId: str(64) }),
+  z.object({ kind: z.literal("disposable_open_voting") }),
+  z.object({ kind: z.literal("disposable_vote"), photoIds: z.array(str(64)).max(50) }),
+  z.object({ kind: z.literal("disposable_open_reveal") }),
+  z.object({ kind: z.literal("disposable_end") }),
+]);
+type EventBody = z.infer<typeof EventSchema>;
 
 export async function POST(
   req: NextRequest,
@@ -91,8 +76,27 @@ export async function POST(
   const gt = getGameType(game.type);
   if (!gt) return NextResponse.json({ error: "unknown game type" }, { status: 500 });
 
-  const body = (await req.json().catch(() => null)) as EventBody | null;
-  if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  // ── Authorization ──────────────────────────────────────────────────────
+  // Being signed in (or holding a guest cookie) is NOT enough. The actor must
+  // be a participant in THIS session, a site admin, or the game's host —
+  // otherwise anyone with a leaked game id could act in a session they never
+  // joined (cross-session IDOR): inject quiz answers, farm Bingo claims, etc.
+  const isMember = !!(await getPlayer(game.session_id, user.id));
+  let authorized = isMember || isAdminEmail(user.email);
+  if (!authorized) {
+    // Non-members are allowed only as the host of a host-driven game — the host
+    // runs the game without necessarily joining the roster as a player.
+    const probe = (await getGameState(game)) as { hostId?: string | null };
+    authorized = !!probe?.hostId && probe.hostId === user.id;
+  }
+  if (!authorized)
+    return NextResponse.json({ error: "not a participant in this session" }, { status: 403 });
+
+  const raw = await req.json().catch(() => null);
+  const parsed = raw == null ? null : EventSchema.safeParse(raw);
+  if (!parsed || !parsed.success)
+    return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  const body: EventBody = parsed.data;
 
   const ctx = { gameId: game.id, sessionId: game.session_id };
   const now = Date.now();
@@ -231,19 +235,24 @@ export async function POST(
     // Re-read state and auto-pair from the head of the waiting queue while we
     // have ≥2 ready. This keeps the matching logic out of the (pure) reducer.
     let next = (await getGameState(game)) as SpeedPairState;
-    while (next.waiting.length >= 2) {
+    let safety = 0;
+    while (next.waiting.length >= 2 && safety++ < 100) {
       const a = next.waiting[0];
       const b = next.waiting[1];
-      const assignAt = Date.now();
+      if (a === b) break; // never pair a player with themselves
+      const before = next.waiting.length;
       await appendEvent({
         id: crypto.randomUUID(),
         gameId: game.id,
         kind: "speed_pair_assign",
         actorId: null,
         targetId: null,
-        payload: { players: [a, b], at: assignAt },
+        payload: { players: [a, b], at: Date.now() },
       });
       next = (await getGameState(game)) as SpeedPairState;
+      // If the assign didn't consume from the queue, stop rather than spin
+      // forever appending assign events the reducer keeps rejecting.
+      if (next.waiting.length >= before) break;
     }
     await notifySession(game.session_id, "speed_pair_done");
     return NextResponse.json({ ok: true });

@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import { getSession, joinSession, listPlayers } from "@/lib/sessions";
 import { createGuest, getCurrentUser } from "@/lib/session";
-import { isLocale, type Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/locales";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import Wordmark from "@/components/Wordmark";
 
@@ -33,8 +34,10 @@ export default async function ScanLanding({
   async function joinAsGuest(formData: FormData) {
     "use server";
     const name = String(formData.get("name") ?? "").trim().slice(0, 60) || "Guest";
-    const localeRaw = formData.get("locale");
-    const locale: Locale = isLocale(localeRaw) ? localeRaw : "en";
+    // Honor the locale the visitor picked via the switcher (next-intl writes it
+    // to the NEXT_LOCALE cookie) instead of always storing "en".
+    const localeRaw = (await cookies()).get("NEXT_LOCALE")?.value ?? "";
+    const locale: Locale = isLocale(localeRaw) ? localeRaw : DEFAULT_LOCALE;
     const guest = await createGuest(name, locale);
     await joinSession(id, guest.id);
     redirect(`/session/${id}`);
@@ -83,7 +86,6 @@ export default async function ScanLanding({
                 className="w-full border-2 border-ink bg-cream px-3 py-2 font-body focus:outline-none focus:bg-yellow"
               />
             </div>
-            <input type="hidden" name="locale" value="en" />
             <button
               type="submit"
               className="bg-ink text-cream font-display font-bold uppercase px-6 py-3 transition hover:translate-y-0.5"
