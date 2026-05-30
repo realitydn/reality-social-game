@@ -22,7 +22,8 @@
     "avatarUploading": "Uploading…",
     "avatarError": "Could not upload",
     "avatarHelper": "Camera or photo from your phone — we resize it before upload.",
-    "save": "Save"
+    "save": "Save",
+    "signOut": "Sign out"
   },
   "scan": {
     "joiningHeading": "You're joining",

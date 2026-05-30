@@ -22,7 +22,8 @@
     "avatarUploading": "Đang tải lên…",
     "avatarError": "Không tải lên được",
     "avatarHelper": "Chụp hoặc chọn từ điện thoại — chúng tôi sẽ thu nhỏ trước khi tải.",
-    "save": "Lưu"
+    "save": "Lưu",
+    "signOut": "Đăng xuất"
   },
   "scan": {
     "joiningHeading": "Bạn đang tham gia",

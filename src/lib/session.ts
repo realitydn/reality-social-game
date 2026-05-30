@@ -82,6 +82,11 @@ export async function createGuest(displayName: string, locale: Locale): Promise<
   return user;
 }
 
+export async function clearGuest(): Promise<void> {
+  // Remove the guest cookie (path matches how createGuest set it).
+  (await cookies()).set(GUEST_COOKIE, "", { path: "/", maxAge: 0 });
+}
+
 export async function updateProfile(
   userId: string,
   patch: { name?: string; locale?: Locale; newsletter_opt_in?: boolean },

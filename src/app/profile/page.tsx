@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getCurrentUser, updateProfile } from "@/lib/session";
+import { signOutEverywhere } from "@/app/guest-action";
 import { LOCALES, LOCALE_LABELS, isLocale, type Locale } from "@/i18n/locales";
 import AvatarUpload from "@/components/AvatarUpload";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
@@ -124,6 +125,16 @@ export default async function ProfilePage() {
               }}
             >
               {t("save")}
+            </button>
+          </form>
+
+          <form action={signOutEverywhere} className="mt-6">
+            <button
+              type="submit"
+              className="w-full border-2 border-ink text-ink font-display font-bold uppercase px-6 py-3 transition hover:bg-ink hover:text-cream"
+              style={{ letterSpacing: "0.05em" }}
+            >
+              {t("signOut")}
             </button>
           </form>
         </div>
