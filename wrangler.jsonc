@@ -44,5 +44,11 @@
       "bucket_name": "socialgame-photos"
     }
   ],
+  // Custom domain. Cloudflare provisions the DNS record + cert automatically
+  // since realitydn.com is a zone on this account. The *.workers.dev URL keeps
+  // working alongside it.
+  "routes": [
+    { "pattern": "app.realitydn.com", "custom_domain": true }
+  ],
   "observability": { "enabled": true }
 }

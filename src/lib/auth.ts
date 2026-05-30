@@ -6,6 +6,10 @@ import { getDB } from "./db";
 export const { handlers, signIn, signOut, auth } = NextAuth(async () => {
   const db = await getDB();
   return {
+    // Trust the proxied host header (Cloudflare in front of the custom domain).
+    // Without this, Auth.js v5 rejects requests on any non-inferred host with
+    // UntrustedHost — required for Google sign-in at app.realitydn.com.
+    trustHost: true,
     adapter: D1Adapter(db),
     providers: [Google],
     session: { strategy: "database" },
