@@ -10,6 +10,7 @@ import {
 } from "@/games/registry";
 import { getPackage, listPackages } from "@/lib/packages";
 import { getCurrentUser } from "@/lib/session";
+import { isAdmin, listStaffUsers } from "@/lib/roles";
 import {
   DEFAULT_QUIZ_ROUND_CONFIG,
   type QuizRoundConfig,
@@ -41,24 +42,42 @@ export default async function AdminSessionPage({
   const players = await listPlayers(session.id);
   const game = await getActiveGame(session.id);
   const quizPackages = await listPackages({ gameType: "quiz-round" });
+  // Staff with signed-in accounts — populates the host picker on host-driven
+  // game start forms. The current user is preselected when present.
+  const staffUsers = await listStaffUsers();
+  const currentUser = await getCurrentUser();
+  const staffUserIds = new Set(staffUsers.map((s) => s.user_id));
+
+  // Resolve the host for a host-driven game from the form's "hostId" picker:
+  // honor it only if it's a real staff user_id, otherwise fall back to the
+  // acting admin. Closes over staffUserIds (fetched per request above).
+  async function resolveHostId(formData: FormData, fallbackId: string): Promise<string> {
+    "use server";
+    const picked = String(formData.get("hostId") ?? "");
+    return staffUserIds.has(picked) ? picked : fallbackId;
+  }
 
   async function end() {
     "use server";
+    const u = await getCurrentUser();
+    if (!u || !(await isAdmin(u.email))) return;
     await endSession(id);
     redirect("/admin");
   }
 
   async function startSimpleGame(formData: FormData) {
     "use server";
+    const u = await getCurrentUser();
+    if (!u || !(await isAdmin(u.email))) return;
     const type = String(formData.get("type") ?? "");
     if (!type) return;
     if (GAMES_REQUIRING_PACKAGE.has(type)) return;
     // Host-driven games (no package) need the hostId in seedData so the
-    // reducer can lock host events to the starter. Other games ignore it.
+    // reducer can lock host events to a designated staff user. The admin may
+    // pick any signed-in staff member; otherwise we fall back to the admin.
     let options: Parameters<typeof startGame>[2] = {};
     if (HOST_DRIVEN_GAMES.has(type)) {
-      const user = await getCurrentUser();
-      if (user) options = { seedData: { hostId: user.id } };
+      options = { seedData: { hostId: await resolveHostId(formData, u.id) } };
     }
     await startGame(id, type, options);
     redirect(`/admin/session/${id}`);
@@ -66,10 +85,10 @@ export default async function AdminSessionPage({
 
   async function startQuizRound(formData: FormData) {
     "use server";
+    const user = await getCurrentUser();
+    if (!user || !(await isAdmin(user.email))) return;
     const packageId = String(formData.get("packageId") ?? "");
     if (!packageId) return;
-    const user = await getCurrentUser();
-    if (!user) return;
     const pkg = await getPackage(packageId);
     if (!pkg || pkg.game_type !== "quiz-round") return;
     const seedConfig: QuizRoundConfig = {
@@ -79,7 +98,7 @@ export default async function AdminSessionPage({
     const questions =
       ((pkg.content as { questions?: QuizRoundQuestion[] }).questions) ?? [];
     const seed: QuizRoundSeed = {
-      hostId: user.id,
+      hostId: await resolveHostId(formData, user.id),
       questions,
       config: seedConfig,
     };
@@ -93,7 +112,7 @@ export default async function AdminSessionPage({
   async function startDisposableCamera(formData: FormData) {
     "use server";
     const user = await getCurrentUser();
-    if (!user) return;
+    if (!user || !(await isAdmin(user.email))) return;
     const photosRaw = parseInt(String(formData.get("photosPerPlayer") ?? "5"), 10);
     const votesRaw = parseInt(String(formData.get("votesPerPlayer") ?? "3"), 10);
     const directionRaw = String(formData.get("cameraDirection") ?? "either");
@@ -108,13 +127,18 @@ export default async function AdminSessionPage({
     };
     await startGame(id, "disposable-camera", {
       config,
-      seedData: { hostId: user.id, config } satisfies DisposableCameraSeed,
+      seedData: {
+        hostId: await resolveHostId(formData, user.id),
+        config,
+      } satisfies DisposableCameraSeed,
     });
     redirect(`/admin/session/${id}`);
   }
 
   async function endActiveGame() {
     "use server";
+    const u = await getCurrentUser();
+    if (!u || !(await isAdmin(u.email))) return;
     if (game) await endGame(game.id);
     redirect(`/admin/session/${id}`);
   }
@@ -200,7 +224,9 @@ export default async function AdminSessionPage({
             {!session.ends_at && (
               <div className="flex flex-wrap gap-2">
                 {PLAYABLE_GAME_TYPES.filter(
-                  (g) => !GAMES_WITH_CUSTOM_START_FORM.has(g.key),
+                  // Karaoke is host-driven, so it gets its own form with a host
+                  // picker below (rather than a bare one-tap start button).
+                  (g) => !GAMES_WITH_CUSTOM_START_FORM.has(g.key) && g.key !== "karaoke-queue",
                 ).map((g) => (
                   <form key={g.key} action={startSimpleGame}>
                     <input type="hidden" name="type" value={g.key} />
@@ -276,6 +302,7 @@ export default async function AdminSessionPage({
                     className="border-2 border-ink px-1 py-0.5 w-16 font-body text-sm"
                   />
                 </label>
+                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
                 {game ? (
                   <ConfirmSubmitButton
                     className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
@@ -328,6 +355,7 @@ export default async function AdminSessionPage({
                     </option>
                   ))}
                 </select>
+                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
                 {game ? (
                   <ConfirmSubmitButton
                     disabled={quizPackages.length === 0}
@@ -362,6 +390,44 @@ export default async function AdminSessionPage({
               </form>
             )}
 
+            {!session.ends_at && (
+              <form
+                action={startSimpleGame}
+                className="flex flex-wrap gap-2 items-stretch border border-dashed border-ink/30 p-2"
+              >
+                <input type="hidden" name="type" value="karaoke-queue" />
+                <span
+                  className="font-display font-semibold text-xs uppercase text-ink/60 self-center px-1"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  Karaoke Queue
+                </span>
+                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
+                {game ? (
+                  <ConfirmSubmitButton
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                    style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+                    title="Switch game?"
+                    body="This ends the current game (scores saved) and starts the Karaoke Queue."
+                    confirmLabel="Switch"
+                  >
+                    Switch to Karaoke Queue
+                  </ConfirmSubmitButton>
+                ) : (
+                  <button
+                    type="submit"
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                    style={{
+                      letterSpacing: "0.05em",
+                      boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
+                    }}
+                  >
+                    Start Karaoke Queue
+                  </button>
+                )}
+              </form>
+            )}
+
             {game && (
               <form action={endActiveGame}>
                 <ConfirmSubmitButton
@@ -387,5 +453,35 @@ export default async function AdminSessionPage({
         <AttendeeList sessionId={session.id} initial={players} />
       </section>
     </main>
+  );
+}
+
+// Host picker for host-driven game start forms. Lists signed-in staff (locked
+// to a user_id); preselects the acting user when they're in the list, with a
+// "Me / default" first option that falls back to the acting admin server-side.
+function HostPicker({
+  staffUsers,
+  currentUserId,
+}: {
+  staffUsers: { user_id: string; name: string | null; email: string }[];
+  currentUserId: string | null;
+}) {
+  const selfIsStaff = currentUserId !== null && staffUsers.some((s) => s.user_id === currentUserId);
+  return (
+    <label className="flex items-center gap-1 font-body text-xs text-ink/60">
+      Host
+      <select
+        name="hostId"
+        defaultValue={selfIsStaff ? (currentUserId as string) : ""}
+        className="border-2 border-ink px-1 py-0.5 font-body text-sm max-w-[10rem]"
+      >
+        <option value="">Me / default</option>
+        {staffUsers.map((s) => (
+          <option key={s.user_id} value={s.user_id}>
+            {s.name || s.email}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

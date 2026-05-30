@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/session";
+import { isAdmin } from "@/lib/roles";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import SignInButtons from "@/components/SignInButtons";
 import Wordmark from "@/components/Wordmark";
@@ -9,6 +10,7 @@ export default async function Home() {
   const t = await getTranslations("home");
   const tFooter = await getTranslations("footer");
   const user = await getCurrentUser();
+  const admin = user ? await isAdmin(user.email) : false;
   return (
     <main className="min-h-dvh flex flex-col">
       <header className="flex items-center justify-between p-6">
@@ -46,6 +48,15 @@ export default async function Home() {
             >
               {t("leaderboardCta")}
             </Link>
+            {admin && (
+              <Link
+                href="/admin"
+                className="font-display font-semibold text-xs uppercase text-ink/50 hover:text-ink pt-1"
+                style={{ letterSpacing: "0.05em" }}
+              >
+                Admin →
+              </Link>
+            )}
           </div>
         ) : (
           <SignInButtons />

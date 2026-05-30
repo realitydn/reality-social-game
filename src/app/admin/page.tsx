@@ -8,9 +8,18 @@ export default async function AdminHome() {
     <main className="min-h-dvh flex flex-col">
       <header className="flex items-center justify-between p-6">
         <Wordmark />
-        <span className="font-display font-semibold text-xs uppercase text-ink/60" style={{ letterSpacing: "0.05em" }}>
-          Admin
-        </span>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/admin/staff"
+            className="font-display font-semibold text-xs uppercase text-ink/60 hover:text-ink"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            Staff
+          </Link>
+          <span className="font-display font-semibold text-xs uppercase text-ink/60" style={{ letterSpacing: "0.05em" }}>
+            Admin
+          </span>
+        </div>
       </header>
       <section className="flex-1 px-6 max-w-2xl w-full mx-auto">
         <h1 className="font-display font-bold text-3xl uppercase mb-8" style={{ letterSpacing: "0.05em" }}>

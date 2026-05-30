@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import { createSession } from "@/lib/sessions";
+import { getCurrentUser } from "@/lib/session";
+import { isAdmin } from "@/lib/roles";
 import Wordmark from "@/components/Wordmark";
 
 export default function NewSessionPage() {
   async function create(formData: FormData) {
     "use server";
+    const u = await getCurrentUser();
+    if (!u || !(await isAdmin(u.email))) return;
     const raw = String(formData.get("name") ?? "").trim();
     const name = raw.length > 0 ? raw.slice(0, 80) : defaultName();
     const session = await createSession(name);

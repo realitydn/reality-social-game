@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/admin";
+import { isAdmin } from "@/lib/roles";
 
-// Soft admin gate via ADMIN_EMAILS env var. Any signed-in user whose email
-// is on the list gets through; everyone else is redirected home.
+// Admin gate. Admins come from the staff_roles table or the ADMIN_EMAILS
+// bootstrap seed (see @/lib/roles). Non-admins are redirected home. This
+// layout redirect is UX only — server actions guard themselves (they're
+// public endpoints the redirect can't protect).
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  if (!isAdminEmail(session?.user?.email)) redirect("/");
+  if (!(await isAdmin(session?.user?.email))) redirect("/");
   return <>{children}</>;
 }
