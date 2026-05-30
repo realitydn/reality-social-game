@@ -8,6 +8,7 @@ import type { TFData } from "@/games/quiz-round/question-types/true-false";
 import { useRoomNotifications } from "@/lib/use-room-notifications";
 import ConfirmModal from "@/components/ConfirmModal";
 import LiveBadge from "@/components/LiveBadge";
+import AwardPoints from "@/components/AwardPoints";
 
 // Human-readable labels for the raw reducer `state.phase` so the host pill never
 // surfaces internal tokens like "revealed" / "lobby".
@@ -267,6 +268,13 @@ export default function HostControlPanel({
           </div>
         </div>
       )}
+
+      <AwardPoints
+        sessionId={sessionId}
+        players={players}
+        reason="quiz_winner"
+        title="Award bonus points (Top Pub Quiz)"
+      />
 
       <ConfirmModal
         open={confirmEnd}

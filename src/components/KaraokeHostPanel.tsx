@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import ConfirmModal from "@/components/ConfirmModal";
 import LiveBadge from "@/components/LiveBadge";
+import AwardPoints from "@/components/AwardPoints";
 import { KaraokeQueueGame } from "@/games/karaoke-queue";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import { type Locale } from "@/i18n/locales";
@@ -318,6 +319,13 @@ export default function KaraokeHostPanel({
           </ul>
         </details>
       )}
+
+      <AwardPoints
+        sessionId={sessionId}
+        players={players}
+        reason="karaoke_dare"
+        title="Award dare bonus (Top Karaoke)"
+      />
 
       <ConfirmModal
         open={!!confirmRemoveId}
