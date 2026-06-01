@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/session";
 import { getGame, getGameState } from "@/lib/games";
 import { findPlayerByCode, getPlayer } from "@/lib/sessions";
 import { isAdminEmail } from "@/lib/admin";
+import { PRESENCE, resolveGamePolicy } from "@/lib/presence";
 import { appendEvent } from "@/lib/events";
 import { notifySession } from "@/lib/realtime";
 import { getGameType } from "@/games/registry";
@@ -97,8 +98,10 @@ export async function POST(
   // be a participant in THIS session, a site admin, or the game's host —
   // otherwise anyone with a leaked game id could act in a session they never
   // joined (cross-session IDOR): inject quiz answers, farm Bingo claims, etc.
-  const isMember = !!(await getPlayer(game.session_id, user.id));
-  let authorized = isMember || isAdminEmail(user.email);
+  const player = await getPlayer(game.session_id, user.id);
+  const isMember = !!player;
+  const admin = isAdminEmail(user.email);
+  let authorized = isMember || admin;
   if (!authorized) {
     // Non-members are allowed only as the host of a host-driven game — the host
     // runs the game without necessarily joining the roster as a player.
@@ -107,6 +110,35 @@ export async function POST(
   }
   if (!authorized)
     return NextResponse.json({ error: "not a participant in this session" }, { status: 403 });
+
+  // ── Presence + Account gate ──────────────────────────────────────────────
+  // Applies to players acting in a game. Admins and the game's host are exempt
+  // (they run it, and got here via those branches — not as a roster member).
+  // Policy is per game type, overridable by a `presence` block on games.config.
+  if (isMember && !admin && player) {
+    let cfg: unknown = {};
+    try {
+      cfg = JSON.parse(game.config);
+    } catch {
+      /* fall back to per-type default policy */
+    }
+    const policy = resolveGamePolicy(game.type, cfg);
+    if (policy.accountRequired && player.is_guest)
+      return NextResponse.json(
+        { error: "Sign in with a Google account to play this game." },
+        { status: 403 },
+      );
+    if (player.presence_level < policy.tier)
+      return NextResponse.json(
+        {
+          error:
+            policy.tier >= PRESENCE.SESSION
+              ? "Scan tonight's QR code on the screen to play this game."
+              : "Scan the REALITY QR code in the venue to play this game.",
+        },
+        { status: 403 },
+      );
+  }
 
   const raw = await req.json().catch(() => null);
   const parsed = raw == null ? null : EventSchema.safeParse(raw);
