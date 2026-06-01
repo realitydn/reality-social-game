@@ -66,7 +66,9 @@ export function reduceDisposableCamera(
       const seen = new Set<string>();
       const accepted: string[] = [];
       for (const id of event.photoIds) {
-        if (accepted.length >= state.config.votesPerPlayer) break;
+        // Unlimited mode (popularity contest) skips the per-player cap.
+        if (!state.config.unlimitedVotes && accepted.length >= state.config.votesPerPlayer)
+          break;
         if (typeof id !== "string") continue;
         if (!validIds.has(id) || seen.has(id)) continue;
         // Silently drop self-votes — the validator allows them through but

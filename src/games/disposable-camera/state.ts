@@ -17,14 +17,23 @@ export type DisposableCameraConfig = {
   /** front = selfie only; back = environment only; either = player picks per shot. */
   cameraDirection: CameraDirection;
   /** Cap on votes per player in the voting phase. Self-votes are silently
-   *  filtered by the reducer regardless of cap. */
+   *  filtered by the reducer regardless of cap. Ignored when unlimitedVotes. */
   votesPerPlayer: number;
+  /** When true there's no per-player cap — every right-swipe is a +1 to that
+   *  photo (popularity contest). When false, votesPerPlayer is the cap. */
+  unlimitedVotes?: boolean;
+  /** Presence tier required to VOTE: 0 none · 1 venue (static QR) · 2 session
+   *  (dynamic QR). Lets the around-town contest keep capture open while gating
+   *  party voting. Capture presence is the game's generic config.presence tier. */
+  votePresenceTier?: number;
 };
 
 export const DEFAULT_DISPOSABLE_CAMERA_CONFIG: DisposableCameraConfig = {
   photosPerPlayer: 5,
   cameraDirection: "either",
   votesPerPlayer: 3,
+  unlimitedVotes: false,
+  votePresenceTier: 0,
 };
 
 export type DisposablePhoto = {
