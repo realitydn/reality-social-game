@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/session";
 import { isAdmin } from "@/lib/roles";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import SignInButtons from "@/components/SignInButtons";
+import GoogleReviewPrompt from "@/components/GoogleReviewPrompt";
 import Wordmark from "@/components/Wordmark";
 
 export default async function Home() {
@@ -62,6 +63,7 @@ export default async function Home() {
           <SignInButtons />
         )}
       </section>
+      <GoogleReviewPrompt />
       <footer className="p-6 text-center text-xs font-body text-ink/60">
         {tFooter("address")} · realitydn.com
       </footer>

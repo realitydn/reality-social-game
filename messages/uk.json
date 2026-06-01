@@ -69,5 +69,9 @@
   "bigScreen": {
     "scanToJoin": "Скануйте, щоб приєднатися",
     "inTheRoom": "У залі"
+  },
+  "review": {
+    "lead": "Подобається REALITY?",
+    "cta": "Залиште відгук у Google"
   }
 }

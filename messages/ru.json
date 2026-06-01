@@ -69,5 +69,9 @@
   "bigScreen": {
     "scanToJoin": "Сканируйте, чтобы войти",
     "inTheRoom": "В зале"
+  },
+  "review": {
+    "lead": "Нравится REALITY?",
+    "cta": "Оставьте отзыв в Google"
   }
 }
