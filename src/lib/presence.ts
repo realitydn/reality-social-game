@@ -53,3 +53,19 @@ export function resolveGamePolicy(gameType: string, config: unknown): GamePresen
         : base.accountRequired,
   };
 }
+
+// The per-type default, for seeding a setup form's controls.
+export function defaultGamePolicy(gameType: string): GamePresencePolicy {
+  return DEFAULTS[gameType] ?? FALLBACK;
+}
+
+// Read a `presence` override from a start form. Returns {} when the form has no
+// presence controls (e.g. the one-tap meeting games) so per-type defaults apply.
+export function presenceConfigFromForm(
+  formData: FormData,
+): { presence?: GamePresencePolicy } {
+  const tierRaw = formData.get("presenceTier");
+  if (tierRaw === null) return {};
+  const tier: PresenceLevel = tierRaw === "1" ? 1 : tierRaw === "2" ? 2 : 0;
+  return { presence: { tier, accountRequired: formData.get("accountRequired") === "on" } };
+}

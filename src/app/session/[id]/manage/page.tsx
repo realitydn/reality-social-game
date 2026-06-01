@@ -24,8 +24,10 @@ import {
 } from "@/games/disposable-camera/state";
 import type { DisposableCameraSeed } from "@/games/disposable-camera";
 import { getBaseUrl } from "@/lib/url";
+import { presenceConfigFromForm, resolveGamePolicy } from "@/lib/presence";
 import AttendeeList from "@/components/AttendeeList";
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
+import PresenceControls from "@/components/PresenceControls";
 import Wordmark from "@/components/Wordmark";
 
 export default async function AdminSessionPage({
@@ -98,10 +100,12 @@ export default async function AdminSessionPage({
     // Host-driven games (no package) need the hostId in seedData so the
     // reducer can lock host events to a designated staff user. An admin may
     // pick any signed-in staff member; a non-admin host always hosts their own.
-    let options: Parameters<typeof startGame>[2] = {};
+    const options: Parameters<typeof startGame>[2] = {
+      config: presenceConfigFromForm(formData),
+    };
     if (HOST_DRIVEN_GAMES.has(type)) {
       const hostId = (await isAdmin(u.email)) ? await resolveHostId(formData, u.id) : u.id;
-      options = { seedData: { hostId } };
+      options.seedData = { hostId };
     }
     await startGame(id, type, options);
     redirect(`/session/${id}/manage`);
@@ -129,7 +133,7 @@ export default async function AdminSessionPage({
       config: seedConfig,
     };
     await startGame(id, "quiz-round", {
-      config: { packageId, packageName: pkg.name },
+      config: { packageId, packageName: pkg.name, ...presenceConfigFromForm(formData) },
       seedData: seed,
     });
     redirect(`/session/${id}/manage`);
@@ -153,7 +157,9 @@ export default async function AdminSessionPage({
       votesPerPlayer: Math.min(20, Math.max(1, Number.isFinite(votesRaw) ? votesRaw : 3)),
     };
     await startGame(id, "disposable-camera", {
-      config,
+      // games.config carries the presence/account override for the gate; the
+      // seed keeps the pure camera config the game reducer reads.
+      config: { ...config, ...presenceConfigFromForm(formData) },
       seedData: {
         hostId: (await isAdmin(user.email)) ? await resolveHostId(formData, user.id) : user.id,
         config,
@@ -338,6 +344,7 @@ export default async function AdminSessionPage({
                     className="border-2 border-ink px-1 py-0.5 w-16 font-body text-sm"
                   />
                 </label>
+                <PresenceControls defaults={resolveGamePolicy("disposable-camera", {})} />
                 {admin && <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />}
                 {game ? (
                   <ConfirmSubmitButton
@@ -391,6 +398,7 @@ export default async function AdminSessionPage({
                     </option>
                   ))}
                 </select>
+                <PresenceControls defaults={resolveGamePolicy("quiz-round", {})} />
                 {admin && <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />}
                 <label className="flex items-center gap-1 font-body text-xs text-ink/60 self-center">
                   <input type="checkbox" name="teamsEnabled" className="w-4 h-4 accent-ink" />
