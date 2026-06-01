@@ -1,15 +1,14 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { isHost } from "@/lib/roles";
+import { isAdmin } from "@/lib/roles";
 
-// Staff console gate. Any staff member (admin OR host) may enter — hosts get a
-// scoped view (only the controls their capabilities unlock), admins see
-// everything. Non-staff are redirected home. This layout redirect is UX only:
-// every server action re-checks the specific capability it needs (admin /
-// can(create:session) / can(start:<type>) / session ownership), because a
-// layout can't protect the public POST endpoints the actions compile to.
+// Admin-only gate. The /admin console is the unified surface — sessions
+// overview, staff + capability management, and (later) REALITY membership /
+// perks. Only admins see it; hosts get their own scoped surface at /host and
+// run their games from the /session/[id]/manage control desk. This layout
+// redirect is UX only — server actions guard themselves (public POST endpoints).
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  if (!(await isHost(session?.user?.email))) redirect("/");
+  if (!(await isAdmin(session?.user?.email))) redirect("/");
   return <>{children}</>;
 }

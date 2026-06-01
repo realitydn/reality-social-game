@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/session";
+import { auth } from "@/lib/auth";
+import { isHost } from "@/lib/roles";
 
-// Soft sign-in gate. No allowlist — any signed-in user can author packages.
-// Per the obscurity-only stance for v1; tighten later if abuse shows up.
+// Host surface gate. Staff only (admin or host): this is where hosts author
+// quiz packages and run their own sessions. Non-staff are sent home. Like the
+// admin layout, this is UX only — actions and the control desk self-authorize.
 export default async function HostLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/");
+  const session = await auth();
+  if (!(await isHost(session?.user?.email))) redirect("/");
   return <>{children}</>;
 }
