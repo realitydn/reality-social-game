@@ -14,18 +14,22 @@ There are exactly two kinds of staff access. Pick the one that matches what you 
 
 | Role | Who | Can do |
 |---|---|---|
-| **Admin** | Owners / floor leads (Donald, June) | Everything: create the night, start and switch games, run the staff list, end the night. |
-| **Host** | Whoever runs a specific game (e.g. Sam on Pub Quiz, Kayla on a games night) | Run the *one* game they're handed — advance a quiz, manage the karaoke queue, run the photo game — and award bonus points. No access to the admin panel. |
+| **Admin** | Owners / floor leads (Donald, June) | Everything: create nights, start/switch/end any game, run the staff list, grant capabilities, end the night. |
+| **Host** | Whoever runs games (e.g. Sam on Pub Quiz, Kayla on a games night) | Run a game they're handed — advance a quiz, manage the karaoke queue, run the photo game — and award bonus points. **Plus** whatever an admin grants them (see Capabilities below): typically "create sessions" and "start [their game]", so they can run their slot start-to-finish on their own. |
 
 A host can do everything they need for their game without being an admin. An admin can also host any game themselves. When in doubt, ask to be added as a **host** — it's the lighter, safer grant.
+
+### Capabilities — letting a host run their own night
+
+A plain host can only take control of a game an admin started for them. To let a host run their slot solo — the way **Sam spins up Pub Quiz himself** — an admin grants them **capabilities** on the **Staff** page: tick **Create sessions** and **Start Pub Quiz Scoreboard** (and/or **Start Quiz Round**), then **Save capabilities**. From then on Sam signs in, opens the console, makes his own session, starts his quiz, runs it, and ends it — no admin needed, and no access to anything else (he can't manage staff or touch other people's sessions). Capabilities are per-game, so you hand out exactly what each person needs.
 
 ### Getting access
 
 1. Open **[app.realitydn.com](https://app.realitydn.com)** and sign in with **Google** (top of the home page). Staff access is tied to a real Google account — guests can't be staff.
-2. Ask an admin to add you. They'll go to **Admin → Staff**, type your email, pick **Host** or **Admin**, and hit **Add / update**.
-3. That's it. You can be added by email *before* you've ever signed in — the role waits for you. Next time you sign in, your panel is there.
+2. Ask an admin to add you. They'll go to **Admin → Staff**, type your email, pick **Host** or **Admin**, and hit **Add / update**. If you'll run your own slot, they also tick your **capabilities** there (e.g. *Create sessions*, *Start Pub Quiz Scoreboard*) and **Save**.
+3. That's it. You can be added by email *before* you've ever signed in — the role waits for you. Next time you sign in, a **Host →** (or **Admin →**) link appears on the home screen into your console.
 
-> If you try to open the admin panel and it bounces you back to the home page, your account doesn't have the role yet (or you're signed in as a guest). Ping an admin.
+> If you try to open the console and it bounces you back to the home page, your account doesn't have a role yet (or you're signed in as a guest). Ping an admin.
 
 ---
 
@@ -40,7 +44,9 @@ So the shape of an evening is: **create the session → players join → start a
 
 ---
 
-## 3. Running the night (Admin)
+## 3. Running the night (Admin, or a host with capabilities)
+
+*A host who's been granted "Create sessions" + "Start [game]" follows these same steps — the console just shows them only the games they're allowed to start, and the host picker is skipped (they host their own game automatically).*
 
 ### A. Open the session
 
