@@ -1,50 +1,48 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getTranslations } from "next-intl/server";
-import { getSession, joinSession, listPlayers, setPresence } from "@/lib/sessions";
+import { joinSession, listActiveSessions, setPresence } from "@/lib/sessions";
 import { createGuest, getCurrentUser } from "@/lib/session";
 import { PRESENCE } from "@/lib/presence";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/locales";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import Wordmark from "@/components/Wordmark";
 
-// Public QR target. Lives at the short /s/[id] URL so QR codes stay dense.
-// If the visitor is already authenticated (Google or guest), join immediately
-// and redirect to the player view. Otherwise show a quick guest signup form.
-export default async function ScanLanding({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const session = await getSession(id);
-  if (!session) notFound();
-  if (session.ends_at) {
-    return <SessionEndedNotice />;
+// Static, reusable "I'm in the venue" QR target — print it once and put copies
+// around the space. Unlike /s/[id] (the session-specific dynamic QR on the
+// projector), this resolves whatever session is currently active, joins you,
+// and marks venue-tier presence (tier 1). Works every night, no reprint.
+export default async function HerePage() {
+  const active = (await listActiveSessions())[0] ?? null;
+  if (!active) {
+    return (
+      <main className="min-h-dvh flex flex-col items-center justify-center px-6 text-center">
+        <Wordmark className="mb-6" />
+        <h1 className="font-display font-bold text-3xl uppercase" style={{ letterSpacing: "0.05em" }}>
+          No game running
+        </h1>
+        <p className="font-body text-ink/60 mt-2">Check back when something&apos;s on.</p>
+      </main>
+    );
   }
 
   const user = await getCurrentUser();
   if (user) {
-    await joinSession(id, user.id);
-    // Scanned the session-specific dynamic QR → session-tier presence.
-    await setPresence(id, user.id, PRESENCE.SESSION);
-    redirect(`/session/${id}`);
+    await joinSession(active.id, user.id);
+    await setPresence(active.id, user.id, PRESENCE.VENUE);
+    redirect(`/session/${active.id}`);
   }
 
-  const players = await listPlayers(id);
   const t = await getTranslations("scan");
-
   async function joinAsGuest(formData: FormData) {
     "use server";
     const name = String(formData.get("name") ?? "").trim().slice(0, 60) || "Guest";
-    // Honor the locale the visitor picked via the switcher (next-intl writes it
-    // to the NEXT_LOCALE cookie) instead of always storing "en".
     const localeRaw = (await cookies()).get("NEXT_LOCALE")?.value ?? "";
     const locale: Locale = isLocale(localeRaw) ? localeRaw : DEFAULT_LOCALE;
     const guest = await createGuest(name, locale);
-    await joinSession(id, guest.id);
-    await setPresence(id, guest.id, PRESENCE.SESSION);
-    redirect(`/session/${id}`);
+    await joinSession(active.id, guest.id);
+    await setPresence(active.id, guest.id, PRESENCE.VENUE);
+    redirect(`/session/${active.id}`);
   }
 
   return (
@@ -61,16 +59,9 @@ export default async function ScanLanding({
           >
             {t("joiningHeading")}
           </p>
-          <h1
-            className="font-display font-bold text-3xl uppercase mb-2"
-            style={{ letterSpacing: "0.05em" }}
-          >
-            {session.name}
+          <h1 className="font-display font-bold text-3xl uppercase mb-8" style={{ letterSpacing: "0.05em" }}>
+            {active.name}
           </h1>
-          <p className="font-body text-ink/60 mb-8">
-            {t("countInRoom", { count: players.length })}
-          </p>
-
           <form action={joinAsGuest} className="flex flex-col gap-4">
             <div>
               <label
@@ -98,30 +89,17 @@ export default async function ScanLanding({
               {t("join")}
             </button>
           </form>
-
           <p className="font-body text-xs text-ink/50 mt-6 text-center">
             {t("orSignInPrefix")}{" "}
-            <a href={`/api/auth/signin/google?callbackUrl=/s/${id}`} className="underline">
+            {/* Full navigation to the Auth.js sign-in endpoint (an API route,
+                not a page), so a plain anchor is correct here. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            <a href="/api/auth/signin/google?callbackUrl=/here" className="underline">
               {t("orSignInLink")}
             </a>
           </p>
         </div>
       </section>
-    </main>
-  );
-}
-
-function SessionEndedNotice() {
-  return (
-    <main className="min-h-dvh flex flex-col items-center justify-center px-6 text-center">
-      <Wordmark className="mb-6" />
-      <h1
-        className="font-display font-bold text-3xl uppercase"
-        style={{ letterSpacing: "0.05em" }}
-      >
-        Session ended
-      </h1>
-      <p className="font-body text-ink/60 mt-2">Catch the next one.</p>
     </main>
   );
 }

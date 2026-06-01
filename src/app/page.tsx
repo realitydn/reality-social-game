@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/session";
+import { joinSession, listActiveSessions } from "@/lib/sessions";
 import { getStaffRole } from "@/lib/roles";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import SignInButtons from "@/components/SignInButtons";
@@ -12,6 +14,16 @@ export default async function Home() {
   const tFooter = await getTranslations("footer");
   const user = await getCurrentUser();
   const staffRole = user ? await getStaffRole(user.email) : null;
+  // Menu-join: a signed-in user can hop into the live session without scanning.
+  // This grants no presence (tier 0) — presence-gated games still need a scan.
+  const active = (await listActiveSessions())[0] ?? null;
+  async function joinActive() {
+    "use server";
+    const u = await getCurrentUser();
+    if (!u || !active) return;
+    await joinSession(active.id, u.id);
+    redirect(`/session/${active.id}`);
+  }
   return (
     <main className="min-h-dvh flex flex-col">
       <header className="flex items-center justify-between p-6">
@@ -34,7 +46,19 @@ export default async function Home() {
             <p className="font-body text-ink/80">
               {t("signedInAs", { name: user.name ?? "Guest" })}
             </p>
-            <p className="font-body text-ink/50 text-sm mb-1">{t("joinHint")}</p>
+            {active ? (
+              <form action={joinActive}>
+                <button
+                  type="submit"
+                  className="w-full bg-ink text-cream font-display font-bold uppercase px-6 py-3 transition hover:translate-y-0.5"
+                  style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+                >
+                  {t("joinLive")} →
+                </button>
+              </form>
+            ) : (
+              <p className="font-body text-ink/50 text-sm mb-1">{t("joinHint")}</p>
+            )}
             <Link
               href="/profile"
               className="bg-ink text-cream font-display font-bold uppercase px-6 py-3 transition hover:translate-y-0.5"
