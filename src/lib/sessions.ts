@@ -21,6 +21,8 @@ export type SessionPlayer = {
   joined_at: number;
   score: number;
   code: string | null;
+  /** In-room presence tier: 0 none · 1 venue (static QR) · 2 session (dynamic QR). */
+  presence_level: number;
 };
 
 export async function createSession(
@@ -113,11 +115,29 @@ export async function joinSession(sessionId: string, userId: string): Promise<vo
   await notifySession(sessionId, "player_joined");
 }
 
+// Raise a player's in-room presence tier (never lowers it) and stamp the time.
+// No-op if the player hasn't joined yet, so callers should joinSession first.
+export async function setPresence(
+  sessionId: string,
+  userId: string,
+  level: number,
+): Promise<void> {
+  const db = await getDB();
+  await db
+    .prepare(
+      `UPDATE session_players
+       SET presence_level = MAX(presence_level, ?), verified_at = ?
+       WHERE session_id = ? AND user_id = ?`,
+    )
+    .bind(level, Date.now(), sessionId, userId)
+    .run();
+}
+
 export async function listPlayers(sessionId: string): Promise<SessionPlayer[]> {
   const db = await getDB();
   const result = await db
     .prepare(
-      `SELECT sp.user_id, sp.joined_at, sp.score, sp.code,
+      `SELECT sp.user_id, sp.joined_at, sp.score, sp.code, sp.presence_level,
               u.name AS display_name, u.image AS avatar_url, u.is_guest
        FROM session_players sp
        JOIN users u ON u.id = sp.user_id
@@ -130,6 +150,7 @@ export async function listPlayers(sessionId: string): Promise<SessionPlayer[]> {
       joined_at: number;
       score: number;
       code: string | null;
+      presence_level: number;
       display_name: string | null;
       avatar_url: string | null;
       is_guest: number;
@@ -142,6 +163,7 @@ export async function listPlayers(sessionId: string): Promise<SessionPlayer[]> {
     joined_at: r.joined_at,
     score: r.score,
     code: r.code,
+    presence_level: r.presence_level ?? 0,
   }));
 }
 
