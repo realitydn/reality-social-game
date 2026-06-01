@@ -69,5 +69,9 @@
   "bigScreen": {
     "scanToJoin": "Scan to join",
     "inTheRoom": "In the room"
+  },
+  "review": {
+    "lead": "Enjoying REALITY?",
+    "cta": "Leave a Google review"
   }
 }

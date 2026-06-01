@@ -69,5 +69,9 @@
   "bigScreen": {
     "scanToJoin": "Quét để tham gia",
     "inTheRoom": "Trong phòng"
+  },
+  "review": {
+    "lead": "Bạn thích REALITY chứ?",
+    "cta": "Đánh giá REALITY trên Google"
   }
 }
