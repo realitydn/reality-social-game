@@ -6,12 +6,14 @@ import BingoPendingClaims from "./BingoPendingClaims";
 import TargetHuntView from "./TargetHuntView";
 import SpeedPairView from "./SpeedPairView";
 import QuizRoundView from "./QuizRoundView";
+import QuizScoreboardView from "./QuizScoreboardView";
 import KaraokeQueueView from "./KaraokeQueueView";
 import DisposableCameraView from "./DisposableCameraView";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { QuizScoreboardState } from "@/games/quiz-scoreboard/state";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import type { DisposableCameraState } from "@/games/disposable-camera/state";
 import type { SessionPlayer } from "@/lib/sessions";
@@ -23,6 +25,7 @@ type AnyGameState =
   | TargetHuntState
   | SpeedPairState
   | QuizRoundState
+  | QuizScoreboardState
   | KaraokeQueueState
   | DisposableCameraState;
 
@@ -43,6 +46,7 @@ type Props = {
   targetHuntLabels: Record<string, string>;
   speedPairLabels: Record<string, string>;
   quizRoundLabels: Record<string, string>;
+  quizScoreboardLabels: Record<string, string>;
   karaokeQueueLabels: Record<string, string>;
   disposableCameraLabels: Record<string, string>;
   pollMs?: number;
@@ -57,6 +61,7 @@ export default function GameView({
   targetHuntLabels,
   speedPairLabels,
   quizRoundLabels,
+  quizScoreboardLabels,
   karaokeQueueLabels,
   disposableCameraLabels,
   pollMs = 5000,
@@ -238,6 +243,11 @@ export default function GameView({
         onJoinTeam={handleQuizJoinTeam}
       />
     );
+  }
+
+  if (data.game.type === "quiz-scoreboard") {
+    const state = data.gameState as QuizScoreboardState;
+    return <QuizScoreboardView state={state} labels={quizScoreboardLabels} />;
   }
 
   if (data.game.type === "karaoke-queue") {

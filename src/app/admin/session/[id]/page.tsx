@@ -225,9 +225,12 @@ export default async function AdminSessionPage({
             {!session.ends_at && (
               <div className="flex flex-wrap gap-2">
                 {PLAYABLE_GAME_TYPES.filter(
-                  // Karaoke is host-driven, so it gets its own form with a host
-                  // picker below (rather than a bare one-tap start button).
-                  (g) => !GAMES_WITH_CUSTOM_START_FORM.has(g.key) && g.key !== "karaoke-queue",
+                  // Host-driven games (Karaoke, Pub Quiz Scoreboard, …) each get
+                  // their own form with a host picker below, so they're excluded
+                  // from the bare one-tap start buttons.
+                  (g) =>
+                    !GAMES_WITH_CUSTOM_START_FORM.has(g.key) &&
+                    !HOST_DRIVEN_GAMES.has(g.key),
                 ).map((g) => (
                   <form key={g.key} action={startSimpleGame}>
                     <input type="hidden" name="type" value={g.key} />
@@ -392,6 +395,44 @@ export default async function AdminSessionPage({
                 >
                   Host →
                 </Link>
+              </form>
+            )}
+
+            {!session.ends_at && (
+              <form
+                action={startSimpleGame}
+                className="flex flex-wrap gap-2 items-stretch border border-dashed border-ink/30 p-2"
+              >
+                <input type="hidden" name="type" value="quiz-scoreboard" />
+                <span
+                  className="font-display font-semibold text-xs uppercase text-ink/60 self-center px-1"
+                  style={{ letterSpacing: "0.05em" }}
+                >
+                  Pub Quiz Scoreboard
+                </span>
+                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
+                {game ? (
+                  <ConfirmSubmitButton
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                    style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+                    title="Switch game?"
+                    body="This ends the current game (scores saved) and starts the Pub Quiz Scoreboard."
+                    confirmLabel="Switch"
+                  >
+                    Switch to Pub Quiz Scoreboard
+                  </ConfirmSubmitButton>
+                ) : (
+                  <button
+                    type="submit"
+                    className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
+                    style={{
+                      letterSpacing: "0.05em",
+                      boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)",
+                    }}
+                  >
+                    Start Pub Quiz Scoreboard
+                  </button>
+                )}
               </form>
             )}
 
