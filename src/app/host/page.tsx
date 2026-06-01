@@ -1,9 +1,18 @@
 import Link from "next/link";
 import { listPackages } from "@/lib/packages";
+import { listActiveSessions } from "@/lib/sessions";
+import { getCurrentUser } from "@/lib/session";
+import { CAPABILITY, can } from "@/lib/roles";
 import Wordmark from "@/components/Wordmark";
 
-export default async function HostLibraryPage() {
+export default async function HostHomePage() {
   const packages = await listPackages({ gameType: "quiz-round" });
+  const user = await getCurrentUser();
+  // Hosts granted create:session can run their own night; admins always can.
+  const canCreate = await can(user?.email, CAPABILITY.CREATE_SESSION);
+  // Active sessions this host created — their own slots to run / resume.
+  const active = await listActiveSessions();
+  const mySessions = user ? active.filter((s) => s.created_by === user.id) : [];
 
   return (
     <main className="min-h-dvh flex flex-col">
@@ -25,8 +34,54 @@ export default async function HostLibraryPage() {
           Host
         </h1>
         <p className="font-body text-ink/60 text-sm mb-8">
-          Author quiz packages and slot them into a session via Admin → Start Quiz Round.
+          {canCreate
+            ? "Run your own night and author quiz packages."
+            : "Author quiz packages. An admin starts the session and hands you the controls."}
         </p>
+
+        {canCreate && (
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-4">
+              <h2
+                className="font-display font-semibold text-sm uppercase"
+                style={{ letterSpacing: "0.05em" }}
+              >
+                Your sessions
+              </h2>
+              <Link
+                href="/session/new"
+                className="bg-ink text-cream font-display font-bold uppercase px-4 py-2 transition hover:translate-y-0.5"
+                style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+              >
+                + New session
+              </Link>
+            </div>
+            {mySessions.length === 0 ? (
+              <p className="font-body text-ink/50 text-sm">
+                No active sessions. Start one to run your games.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {mySessions.map((s) => (
+                  <li key={s.id}>
+                    <Link
+                      href={`/session/${s.id}/manage`}
+                      className="flex items-center justify-between border-2 border-ink px-4 py-3 hover:bg-yellow transition"
+                    >
+                      <span
+                        className="font-display font-semibold uppercase"
+                        style={{ letterSpacing: "0.05em" }}
+                      >
+                        {s.name}
+                      </span>
+                      <span className="font-body text-xs text-ink/60">{s.id}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         <h2
           className="font-display font-semibold text-sm uppercase mb-4"

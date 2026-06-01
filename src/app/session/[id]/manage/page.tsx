@@ -58,6 +58,11 @@ export default async function AdminSessionPage({
   // End session / end game: admins, or the host who created this session.
   const canManageSession =
     admin || (!!currentUser && session.created_by === currentUser.id);
+  // This control desk lives outside the admin-only console, so it self-gates:
+  // you may open it if you're an admin or the host who created this session.
+  if (!currentUser || !canManageSession) redirect("/");
+  // Back-link target depends on which surface you came from.
+  const backHref = admin ? "/admin" : "/host";
 
   // Resolve the host for a host-driven game from the form's "hostId" picker:
   // honor it only if it's a real staff user_id, otherwise fall back to the
@@ -75,9 +80,10 @@ export default async function AdminSessionPage({
     const s = await getSession(id);
     if (!s) return;
     // Admin, or the host who created this session, may end it.
-    if (!(await isAdmin(u.email)) && s.created_by !== u.id) return;
+    const isAdminUser = await isAdmin(u.email);
+    if (!isAdminUser && s.created_by !== u.id) return;
     await endSession(id);
-    redirect("/admin");
+    redirect(isAdminUser ? "/admin" : "/host");
   }
 
   async function startSimpleGame(formData: FormData) {
@@ -98,7 +104,7 @@ export default async function AdminSessionPage({
       options = { seedData: { hostId } };
     }
     await startGame(id, type, options);
-    redirect(`/admin/session/${id}`);
+    redirect(`/session/${id}/manage`);
   }
 
   async function startQuizRound(formData: FormData) {
@@ -126,7 +132,7 @@ export default async function AdminSessionPage({
       config: { packageId, packageName: pkg.name },
       seedData: seed,
     });
-    redirect(`/admin/session/${id}`);
+    redirect(`/session/${id}/manage`);
   }
 
   async function startDisposableCamera(formData: FormData) {
@@ -153,7 +159,7 @@ export default async function AdminSessionPage({
         config,
       } satisfies DisposableCameraSeed,
     });
-    redirect(`/admin/session/${id}`);
+    redirect(`/session/${id}/manage`);
   }
 
   async function endActiveGame() {
@@ -165,7 +171,7 @@ export default async function AdminSessionPage({
     // Admin, or the host who created this session, may end the running game.
     if (!(await isAdmin(u.email)) && s.created_by !== u.id) return;
     if (game) await endGame(game.id);
-    redirect(`/admin/session/${id}`);
+    redirect(`/session/${id}/manage`);
   }
 
   return (
@@ -173,11 +179,11 @@ export default async function AdminSessionPage({
       <header className="flex items-center justify-between p-6">
         <Wordmark />
         <Link
-          href="/admin"
+          href={backHref}
           className="font-display font-semibold text-xs uppercase text-ink/60 hover:text-ink"
           style={{ letterSpacing: "0.05em" }}
         >
-          ← All sessions
+          {admin ? "← All sessions" : "← Your sessions"}
         </Link>
       </header>
       <section className="flex-1 px-6 max-w-3xl w-full mx-auto pb-12">

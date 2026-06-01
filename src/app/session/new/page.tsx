@@ -4,7 +4,12 @@ import { getCurrentUser } from "@/lib/session";
 import { CAPABILITY, can } from "@/lib/roles";
 import Wordmark from "@/components/Wordmark";
 
-export default function NewSessionPage() {
+export default async function NewSessionPage() {
+  // Standalone route (no admin layout) — gate the view to anyone who can create
+  // sessions (admins always can; hosts need the create:session capability).
+  const viewer = await getCurrentUser();
+  if (!viewer || !(await can(viewer.email, CAPABILITY.CREATE_SESSION))) redirect("/");
+
   async function create(formData: FormData) {
     "use server";
     const u = await getCurrentUser();
@@ -13,7 +18,7 @@ export default function NewSessionPage() {
     const name = raw.length > 0 ? raw.slice(0, 80) : defaultName();
     // Stamp the creator so a non-admin host can also end the session they made.
     const session = await createSession(name, Date.now(), u.id);
-    redirect(`/admin/session/${session.id}`);
+    redirect(`/session/${session.id}/manage`);
   }
 
   return (

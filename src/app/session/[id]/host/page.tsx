@@ -38,11 +38,11 @@ export default async function SessionHostPage({
         <header className="flex items-center justify-between p-6">
           <Wordmark />
           <Link
-            href={`/admin/session/${id}`}
+            href={`/session/${id}/manage`}
             className="font-display font-semibold text-xs uppercase text-ink/60 hover:text-ink"
             style={{ letterSpacing: "0.05em" }}
           >
-            ← Admin
+            ← Manage
           </Link>
         </header>
         <section className="flex-1 px-6 max-w-3xl w-full mx-auto pb-12 flex items-center justify-center">
@@ -90,11 +90,11 @@ export default async function SessionHostPage({
             Big screen ↗
           </Link>
           <Link
-            href={`/admin/session/${id}`}
+            href={`/session/${id}/manage`}
             className="font-display font-semibold text-xs uppercase text-ink/60 hover:text-ink self-center"
             style={{ letterSpacing: "0.05em" }}
           >
-            ← Admin
+            ← Manage
           </Link>
         </div>
       </header>

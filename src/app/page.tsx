@@ -51,7 +51,7 @@ export default async function Home() {
             </Link>
             {staffRole && (
               <Link
-                href="/admin"
+                href={staffRole === "admin" ? "/admin" : "/host"}
                 className="font-display font-semibold text-xs uppercase text-ink/50 hover:text-ink pt-1"
                 style={{ letterSpacing: "0.05em" }}
               >

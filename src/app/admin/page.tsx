@@ -1,30 +1,23 @@
 import Link from "next/link";
 import { listActiveSessions } from "@/lib/sessions";
-import { getCurrentUser } from "@/lib/session";
-import { CAPABILITY, can, isAdmin } from "@/lib/roles";
 import Wordmark from "@/components/Wordmark";
 
 export default async function AdminHome() {
   const active = await listActiveSessions();
-  const user = await getCurrentUser();
-  const admin = await isAdmin(user?.email);
-  const canCreate = await can(user?.email, CAPABILITY.CREATE_SESSION);
   return (
     <main className="min-h-dvh flex flex-col">
       <header className="flex items-center justify-between p-6">
         <Wordmark />
         <div className="flex items-center gap-4">
-          {admin && (
-            <Link
-              href="/admin/staff"
-              className="font-display font-semibold text-xs uppercase text-ink/60 hover:text-ink"
-              style={{ letterSpacing: "0.05em" }}
-            >
-              Staff
-            </Link>
-          )}
+          <Link
+            href="/admin/staff"
+            className="font-display font-semibold text-xs uppercase text-ink/60 hover:text-ink"
+            style={{ letterSpacing: "0.05em" }}
+          >
+            Staff
+          </Link>
           <span className="font-display font-semibold text-xs uppercase text-ink/60" style={{ letterSpacing: "0.05em" }}>
-            {admin ? "Admin" : "Host"}
+            Admin
           </span>
         </div>
       </header>
@@ -32,15 +25,13 @@ export default async function AdminHome() {
         <h1 className="font-display font-bold text-3xl uppercase mb-8" style={{ letterSpacing: "0.05em" }}>
           Sessions
         </h1>
-        {canCreate && (
-          <Link
-            href="/admin/session/new"
-            className="inline-block bg-ink text-cream font-display font-bold uppercase px-6 py-3 mb-8 transition hover:translate-y-0.5"
-            style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
-          >
-            + New session
-          </Link>
-        )}
+        <Link
+          href="/session/new"
+          className="inline-block bg-ink text-cream font-display font-bold uppercase px-6 py-3 mb-8 transition hover:translate-y-0.5"
+          style={{ letterSpacing: "0.05em", boxShadow: "0 8px 2px rgba(13, 9, 5, 0.18)" }}
+        >
+          + New session
+        </Link>
 
         <h2 className="font-display font-semibold text-sm uppercase mb-4" style={{ letterSpacing: "0.05em" }}>
           Active
@@ -52,7 +43,7 @@ export default async function AdminHome() {
             {active.map((s) => (
               <li key={s.id}>
                 <Link
-                  href={`/admin/session/${s.id}`}
+                  href={`/session/${s.id}/manage`}
                   className="flex items-center justify-between border-2 border-ink px-4 py-3 hover:bg-yellow transition"
                 >
                   <span className="font-display font-semibold uppercase" style={{ letterSpacing: "0.05em" }}>
