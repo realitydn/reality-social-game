@@ -1,17 +1,18 @@
 import { redirect } from "next/navigation";
 import { createSession } from "@/lib/sessions";
 import { getCurrentUser } from "@/lib/session";
-import { isAdmin } from "@/lib/roles";
+import { CAPABILITY, can } from "@/lib/roles";
 import Wordmark from "@/components/Wordmark";
 
 export default function NewSessionPage() {
   async function create(formData: FormData) {
     "use server";
     const u = await getCurrentUser();
-    if (!u || !(await isAdmin(u.email))) return;
+    if (!u || !(await can(u.email, CAPABILITY.CREATE_SESSION))) return;
     const raw = String(formData.get("name") ?? "").trim();
     const name = raw.length > 0 ? raw.slice(0, 80) : defaultName();
-    const session = await createSession(name);
+    // Stamp the creator so a non-admin host can also end the session they made.
+    const session = await createSession(name, Date.now(), u.id);
     redirect(`/admin/session/${session.id}`);
   }
 

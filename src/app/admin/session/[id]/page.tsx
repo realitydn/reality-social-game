@@ -10,7 +10,7 @@ import {
 } from "@/games/registry";
 import { getPackage, listPackages } from "@/lib/packages";
 import { getCurrentUser } from "@/lib/session";
-import { isAdmin, listStaffUsers } from "@/lib/roles";
+import { can, getCapabilities, isAdmin, listStaffUsers, startCapability } from "@/lib/roles";
 import {
   DEFAULT_QUIZ_ROUND_CONFIG,
   type QuizRoundConfig,
@@ -48,6 +48,17 @@ export default async function AdminSessionPage({
   const currentUser = await getCurrentUser();
   const staffUserIds = new Set(staffUsers.map((s) => s.user_id));
 
+  // Capability flags drive which controls render. Admins implicitly can do
+  // everything; hosts only see what they've been granted. The matching server
+  // actions re-check these — the rendering is just UX. `canStart` is computed
+  // from a single capability fetch to avoid a DB round-trip per game type.
+  const admin = await isAdmin(currentUser?.email);
+  const caps = admin ? null : new Set(await getCapabilities(currentUser?.email));
+  const canStart = (type: string) => admin || !!caps?.has(startCapability(type));
+  // End session / end game: admins, or the host who created this session.
+  const canManageSession =
+    admin || (!!currentUser && session.created_by === currentUser.id);
+
   // Resolve the host for a host-driven game from the form's "hostId" picker:
   // honor it only if it's a real staff user_id, otherwise fall back to the
   // acting admin. Closes over staffUserIds (fetched per request above).
@@ -60,7 +71,11 @@ export default async function AdminSessionPage({
   async function end() {
     "use server";
     const u = await getCurrentUser();
-    if (!u || !(await isAdmin(u.email))) return;
+    if (!u) return;
+    const s = await getSession(id);
+    if (!s) return;
+    // Admin, or the host who created this session, may end it.
+    if (!(await isAdmin(u.email)) && s.created_by !== u.id) return;
     await endSession(id);
     redirect("/admin");
   }
@@ -68,16 +83,19 @@ export default async function AdminSessionPage({
   async function startSimpleGame(formData: FormData) {
     "use server";
     const u = await getCurrentUser();
-    if (!u || !(await isAdmin(u.email))) return;
+    if (!u) return;
     const type = String(formData.get("type") ?? "");
     if (!type) return;
     if (GAMES_REQUIRING_PACKAGE.has(type)) return;
+    // Must hold the start capability for this game type (admins always do).
+    if (!(await can(u.email, startCapability(type)))) return;
     // Host-driven games (no package) need the hostId in seedData so the
-    // reducer can lock host events to a designated staff user. The admin may
-    // pick any signed-in staff member; otherwise we fall back to the admin.
+    // reducer can lock host events to a designated staff user. An admin may
+    // pick any signed-in staff member; a non-admin host always hosts their own.
     let options: Parameters<typeof startGame>[2] = {};
     if (HOST_DRIVEN_GAMES.has(type)) {
-      options = { seedData: { hostId: await resolveHostId(formData, u.id) } };
+      const hostId = (await isAdmin(u.email)) ? await resolveHostId(formData, u.id) : u.id;
+      options = { seedData: { hostId } };
     }
     await startGame(id, type, options);
     redirect(`/admin/session/${id}`);
@@ -86,7 +104,8 @@ export default async function AdminSessionPage({
   async function startQuizRound(formData: FormData) {
     "use server";
     const user = await getCurrentUser();
-    if (!user || !(await isAdmin(user.email))) return;
+    if (!user) return;
+    if (!(await can(user.email, startCapability("quiz-round")))) return;
     const packageId = String(formData.get("packageId") ?? "");
     if (!packageId) return;
     const pkg = await getPackage(packageId);
@@ -99,7 +118,7 @@ export default async function AdminSessionPage({
     const questions =
       ((pkg.content as { questions?: QuizRoundQuestion[] }).questions) ?? [];
     const seed: QuizRoundSeed = {
-      hostId: await resolveHostId(formData, user.id),
+      hostId: (await isAdmin(user.email)) ? await resolveHostId(formData, user.id) : user.id,
       questions,
       config: seedConfig,
     };
@@ -113,7 +132,8 @@ export default async function AdminSessionPage({
   async function startDisposableCamera(formData: FormData) {
     "use server";
     const user = await getCurrentUser();
-    if (!user || !(await isAdmin(user.email))) return;
+    if (!user) return;
+    if (!(await can(user.email, startCapability("disposable-camera")))) return;
     const photosRaw = parseInt(String(formData.get("photosPerPlayer") ?? "5"), 10);
     const votesRaw = parseInt(String(formData.get("votesPerPlayer") ?? "3"), 10);
     const directionRaw = String(formData.get("cameraDirection") ?? "either");
@@ -129,7 +149,7 @@ export default async function AdminSessionPage({
     await startGame(id, "disposable-camera", {
       config,
       seedData: {
-        hostId: await resolveHostId(formData, user.id),
+        hostId: (await isAdmin(user.email)) ? await resolveHostId(formData, user.id) : user.id,
         config,
       } satisfies DisposableCameraSeed,
     });
@@ -139,7 +159,11 @@ export default async function AdminSessionPage({
   async function endActiveGame() {
     "use server";
     const u = await getCurrentUser();
-    if (!u || !(await isAdmin(u.email))) return;
+    if (!u) return;
+    const s = await getSession(id);
+    if (!s) return;
+    // Admin, or the host who created this session, may end the running game.
+    if (!(await isAdmin(u.email)) && s.created_by !== u.id) return;
     if (game) await endGame(game.id);
     redirect(`/admin/session/${id}`);
   }
@@ -193,7 +217,7 @@ export default async function AdminSessionPage({
               Host control →
             </Link>
           )}
-          {!session.ends_at && (
+          {!session.ends_at && canManageSession && (
             <form action={end}>
               <ConfirmSubmitButton
                 className="border-2 border-red text-red font-display font-bold uppercase px-5 py-2 transition hover:bg-red hover:text-cream"
@@ -227,10 +251,12 @@ export default async function AdminSessionPage({
                 {PLAYABLE_GAME_TYPES.filter(
                   // Host-driven games (Karaoke, Pub Quiz Scoreboard, …) each get
                   // their own form with a host picker below, so they're excluded
-                  // from the bare one-tap start buttons.
+                  // from the bare one-tap start buttons. Also filtered to the
+                  // game types this staff member is allowed to start.
                   (g) =>
                     !GAMES_WITH_CUSTOM_START_FORM.has(g.key) &&
-                    !HOST_DRIVEN_GAMES.has(g.key),
+                    !HOST_DRIVEN_GAMES.has(g.key) &&
+                    canStart(g.key),
                 ).map((g) => (
                   <form key={g.key} action={startSimpleGame}>
                     <input type="hidden" name="type" value={g.key} />
@@ -261,7 +287,7 @@ export default async function AdminSessionPage({
               </div>
             )}
 
-            {!session.ends_at && (
+            {!session.ends_at && canStart("disposable-camera") && (
               <form
                 action={startDisposableCamera}
                 className="flex flex-wrap gap-2 items-stretch border border-dashed border-ink/30 p-2"
@@ -306,7 +332,7 @@ export default async function AdminSessionPage({
                     className="border-2 border-ink px-1 py-0.5 w-16 font-body text-sm"
                   />
                 </label>
-                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
+                {admin && <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />}
                 {game ? (
                   <ConfirmSubmitButton
                     className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
@@ -332,7 +358,7 @@ export default async function AdminSessionPage({
               </form>
             )}
 
-            {!session.ends_at && (
+            {!session.ends_at && canStart("quiz-round") && (
               <form
                 action={startQuizRound}
                 className="flex flex-wrap gap-2 items-stretch border border-dashed border-ink/30 p-2"
@@ -359,7 +385,7 @@ export default async function AdminSessionPage({
                     </option>
                   ))}
                 </select>
-                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
+                {admin && <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />}
                 <label className="flex items-center gap-1 font-body text-xs text-ink/60 self-center">
                   <input type="checkbox" name="teamsEnabled" className="w-4 h-4 accent-ink" />
                   Teams
@@ -398,7 +424,7 @@ export default async function AdminSessionPage({
               </form>
             )}
 
-            {!session.ends_at && (
+            {!session.ends_at && canStart("quiz-scoreboard") && (
               <form
                 action={startSimpleGame}
                 className="flex flex-wrap gap-2 items-stretch border border-dashed border-ink/30 p-2"
@@ -410,7 +436,7 @@ export default async function AdminSessionPage({
                 >
                   Pub Quiz Scoreboard
                 </span>
-                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
+                {admin && <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />}
                 {game ? (
                   <ConfirmSubmitButton
                     className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
@@ -436,7 +462,7 @@ export default async function AdminSessionPage({
               </form>
             )}
 
-            {!session.ends_at && (
+            {!session.ends_at && canStart("karaoke-queue") && (
               <form
                 action={startSimpleGame}
                 className="flex flex-wrap gap-2 items-stretch border border-dashed border-ink/30 p-2"
@@ -448,7 +474,7 @@ export default async function AdminSessionPage({
                 >
                   Karaoke Queue
                 </span>
-                <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />
+                {admin && <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />}
                 {game ? (
                   <ConfirmSubmitButton
                     className="bg-yellow text-ink font-display font-bold uppercase px-4 py-2 border-2 border-ink transition hover:translate-y-0.5"
@@ -474,7 +500,7 @@ export default async function AdminSessionPage({
               </form>
             )}
 
-            {game && (
+            {game && canManageSession && (
               <form action={endActiveGame}>
                 <ConfirmSubmitButton
                   className="border-2 border-red text-red font-display font-bold uppercase px-4 py-2 transition hover:bg-red hover:text-cream"

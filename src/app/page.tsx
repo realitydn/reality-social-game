@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/session";
-import { isAdmin } from "@/lib/roles";
+import { getStaffRole } from "@/lib/roles";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import SignInButtons from "@/components/SignInButtons";
 import GoogleReviewPrompt from "@/components/GoogleReviewPrompt";
@@ -11,7 +11,7 @@ export default async function Home() {
   const t = await getTranslations("home");
   const tFooter = await getTranslations("footer");
   const user = await getCurrentUser();
-  const admin = user ? await isAdmin(user.email) : false;
+  const staffRole = user ? await getStaffRole(user.email) : null;
   return (
     <main className="min-h-dvh flex flex-col">
       <header className="flex items-center justify-between p-6">
@@ -49,13 +49,13 @@ export default async function Home() {
             >
               {t("leaderboardCta")}
             </Link>
-            {admin && (
+            {staffRole && (
               <Link
                 href="/admin"
                 className="font-display font-semibold text-xs uppercase text-ink/50 hover:text-ink pt-1"
                 style={{ letterSpacing: "0.05em" }}
               >
-                Admin →
+                {staffRole === "admin" ? "Admin →" : "Host →"}
               </Link>
             )}
           </div>
