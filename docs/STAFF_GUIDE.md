@@ -21,7 +21,9 @@ A host can do everything they need for their game without being an admin. An adm
 
 ### Capabilities — letting a host run their own night
 
-A plain host can only take control of a game an admin started for them. To let a host run their slot solo — the way **Sam spins up Pub Quiz himself** — an admin grants them **capabilities** on the **Staff** page: tick **Create sessions** and **Start Pub Quiz Scoreboard** (and/or **Start Quiz Round**), then **Save capabilities**. From then on Sam signs in, opens the console, makes his own session, starts his quiz, runs it, and ends it — no admin needed, and no access to anything else (he can't manage staff or touch other people's sessions). Capabilities are per-game, so you hand out exactly what each person needs.
+A plain host can only take control of a game an admin started for them. To let a host run their slot solo — the way **Sam spins up Pub Quiz himself** — an admin grants them **capabilities** on the **Staff** page: tick **Create sessions** and **Start Pub Quiz Scoreboard** (and/or **Start Quiz Round**), then **Save capabilities**. From then on Sam signs in, taps **Host →** on the home screen to reach his own **Host** page, makes his own session, starts his quiz, runs it, and ends it — no admin needed, and no access to anything else (he never sees the admin area, staff management, or other people's sessions). Capabilities are per-game, so you hand out exactly what each person needs.
+
+> The admin area (`/admin`) is admin-only — it's the management hub. Hosts get their own page at `/host`: their quiz packages, plus (if granted) **+ New session** and a list of their own sessions to run.
 
 ### Getting access
 
@@ -46,7 +48,7 @@ So the shape of an evening is: **create the session → players join → start a
 
 ## 3. Running the night (Admin, or a host with capabilities)
 
-*A host who's been granted "Create sessions" + "Start [game]" follows these same steps — the console just shows them only the games they're allowed to start, and the host picker is skipped (they host their own game automatically).*
+*Admins do this from **[/admin](https://app.realitydn.com/admin)**. A host granted "Create sessions" + "Start [game]" does the same from their **Host** page (`/host` → **+ New session**) — the steps below are identical, except a host only sees the games they're allowed to start, and there's no host picker (they host their own game automatically).*
 
 ### A. Open the session
 
