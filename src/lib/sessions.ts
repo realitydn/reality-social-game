@@ -9,6 +9,8 @@ export type GameSession = {
   starts_at: number;
   ends_at: number | null;
   created_at: number;
+  /** user_id of the staff member who created it; null for legacy/admin rows. */
+  created_by: string | null;
 };
 
 export type SessionPlayer = {
@@ -21,24 +23,38 @@ export type SessionPlayer = {
   code: string | null;
 };
 
-export async function createSession(name: string, startsAt: number = Date.now()): Promise<GameSession> {
+export async function createSession(
+  name: string,
+  startsAt: number = Date.now(),
+  createdBy: string | null = null,
+): Promise<GameSession> {
   const db = await getDB();
   const id = shortId();
   const now = Date.now();
   await db
     .prepare(
-      `INSERT INTO game_sessions (id, venue_id, name, starts_at, ends_at, created_at)
-       VALUES (?, 'reality-dn', ?, ?, NULL, ?)`,
+      `INSERT INTO game_sessions (id, venue_id, name, starts_at, ends_at, created_at, created_by)
+       VALUES (?, 'reality-dn', ?, ?, NULL, ?, ?)`,
     )
-    .bind(id, name, startsAt, now)
+    .bind(id, name, startsAt, now, createdBy)
     .run();
-  return { id, venue_id: "reality-dn", name, starts_at: startsAt, ends_at: null, created_at: now };
+  return {
+    id,
+    venue_id: "reality-dn",
+    name,
+    starts_at: startsAt,
+    ends_at: null,
+    created_at: now,
+    created_by: createdBy,
+  };
 }
 
 export async function getSession(id: string): Promise<GameSession | null> {
   const db = await getDB();
   return db
-    .prepare("SELECT id, venue_id, name, starts_at, ends_at, created_at FROM game_sessions WHERE id = ?")
+    .prepare(
+      "SELECT id, venue_id, name, starts_at, ends_at, created_at, created_by FROM game_sessions WHERE id = ?",
+    )
     .bind(id)
     .first<GameSession>();
 }
@@ -56,7 +72,7 @@ export async function listActiveSessions(): Promise<GameSession[]> {
   const db = await getDB();
   const result = await db
     .prepare(
-      "SELECT id, venue_id, name, starts_at, ends_at, created_at FROM game_sessions WHERE ends_at IS NULL ORDER BY starts_at DESC LIMIT 50",
+      "SELECT id, venue_id, name, starts_at, ends_at, created_at, created_by FROM game_sessions WHERE ends_at IS NULL ORDER BY starts_at DESC LIMIT 50",
     )
     .all<GameSession>();
   return result.results ?? [];

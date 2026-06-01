@@ -80,6 +80,72 @@ export async function removeStaff(email: string): Promise<void> {
   await db.prepare("DELETE FROM staff_roles WHERE email = ?").bind(norm(email)).run();
 }
 
+// ─── Capabilities ───────────────────────────────────────────────────────────
+// Fine-grained grants layered on the coarse admin/host role (staff_capabilities
+// table). Admins implicitly hold every capability; hosts hold only what's been
+// granted. This is how "Sam can start Pub Quiz himself" works without making him
+// an admin: grant him `create:session` + `start:quiz-scoreboard`. Capabilities
+// are plain strings so new ones (start:<gameType>, future redeem:rewards, …)
+// slot in without a schema change.
+
+/** Capability string for starting a specific game type. */
+export function startCapability(gameType: string): string {
+  return `start:${gameType}`;
+}
+
+/** Capability constants that aren't derived from a game type. */
+export const CAPABILITY = {
+  CREATE_SESSION: "create:session",
+} as const;
+
+/** Granted capability strings for an email (excludes the implicit admin-all). */
+export async function getCapabilities(email: string | null | undefined): Promise<string[]> {
+  if (!email) return [];
+  const db = await getDB();
+  const result = await db
+    .prepare("SELECT capability FROM staff_capabilities WHERE email = ?")
+    .bind(norm(email))
+    .all<{ capability: string }>();
+  return (result.results ?? []).map((r) => r.capability);
+}
+
+/**
+ * Whether an email may perform a capability. Admins can do anything; otherwise
+ * the capability must be explicitly granted in staff_capabilities.
+ */
+export async function can(
+  email: string | null | undefined,
+  capability: string,
+): Promise<boolean> {
+  if (!email) return false;
+  if (await isAdmin(email)) return true; // admins hold every capability
+  const db = await getDB();
+  const row = await db
+    .prepare("SELECT 1 FROM staff_capabilities WHERE email = ? AND capability = ?")
+    .bind(norm(email), capability)
+    .first();
+  return !!row;
+}
+
+export async function grantCapability(email: string, capability: string): Promise<void> {
+  const db = await getDB();
+  await db
+    .prepare(
+      `INSERT INTO staff_capabilities (email, capability, created_at) VALUES (?, ?, ?)
+       ON CONFLICT(email, capability) DO NOTHING`,
+    )
+    .bind(norm(email), capability, Date.now())
+    .run();
+}
+
+export async function revokeCapability(email: string, capability: string): Promise<void> {
+  const db = await getDB();
+  await db
+    .prepare("DELETE FROM staff_capabilities WHERE email = ? AND capability = ?")
+    .bind(norm(email), capability)
+    .run();
+}
+
 // Staff who have a signed-in user account — for the host picker when starting a
 // host-driven game (host events are locked to a user_id). Includes both table
 // roles and ADMIN_EMAILS env admins.
