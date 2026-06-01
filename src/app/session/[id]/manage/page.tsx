@@ -147,6 +147,7 @@ export default async function AdminSessionPage({
     const photosRaw = parseInt(String(formData.get("photosPerPlayer") ?? "5"), 10);
     const votesRaw = parseInt(String(formData.get("votesPerPlayer") ?? "3"), 10);
     const directionRaw = String(formData.get("cameraDirection") ?? "either");
+    const voteTierRaw = String(formData.get("votePresenceTier") ?? "0");
     const config: DisposableCameraConfig = {
       photosPerPlayer: Math.min(50, Math.max(1, Number.isFinite(photosRaw) ? photosRaw : 5)),
       cameraDirection: (["front", "back", "either"] as const).includes(
@@ -155,6 +156,8 @@ export default async function AdminSessionPage({
         ? (directionRaw as CameraDirection)
         : "either",
       votesPerPlayer: Math.min(20, Math.max(1, Number.isFinite(votesRaw) ? votesRaw : 3)),
+      unlimitedVotes: formData.get("unlimitedVotes") === "on",
+      votePresenceTier: voteTierRaw === "1" ? 1 : voteTierRaw === "2" ? 2 : 0,
     };
     await startGame(id, "disposable-camera", {
       // games.config carries the presence/account override for the gate; the
@@ -343,6 +346,22 @@ export default async function AdminSessionPage({
                     defaultValue={DEFAULT_DISPOSABLE_CAMERA_CONFIG.votesPerPlayer}
                     className="border-2 border-ink px-1 py-0.5 w-16 font-body text-sm"
                   />
+                </label>
+                <label className="flex items-center gap-1 font-body text-xs text-ink/60 self-center">
+                  <input type="checkbox" name="unlimitedVotes" className="w-4 h-4 accent-ink" />
+                  Unlimited
+                </label>
+                <label className="flex items-center gap-1 font-body text-xs text-ink/60">
+                  Voting
+                  <select
+                    name="votePresenceTier"
+                    defaultValue="0"
+                    className="border-2 border-ink px-1 py-0.5 font-body text-sm"
+                  >
+                    <option value="0">Vote anywhere</option>
+                    <option value="1">Vote in venue</option>
+                    <option value="2">Vote this session</option>
+                  </select>
                 </label>
                 <PresenceControls defaults={resolveGamePolicy("disposable-camera", {})} />
                 {admin && <HostPicker staffUsers={staffUsers} currentUserId={currentUser?.id ?? null} />}

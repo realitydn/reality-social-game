@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type {
   DisposableCameraState,
   DisposablePhoto,
@@ -9,6 +9,7 @@ import { tallyVotes } from "@/games/disposable-camera/state";
 import type { SessionPlayer } from "@/lib/sessions";
 import { resizeImage } from "@/lib/image-resize";
 import ConfirmModal from "@/components/ConfirmModal";
+import DisposableSwipeVote from "@/components/DisposableSwipeVote";
 
 // Fill {token} placeholders in a localized template. Tolerates missing keys
 // (falls back to the token name) so a half-translated locale never crashes.
@@ -62,15 +63,7 @@ export default function DisposableCameraView({
     return <RevealPhase state={state} meId={meId} players={players} labels={labels} ended={false} />;
   }
   if (state.phase === "voting") {
-    return (
-      <VotePhase
-        state={state}
-        meId={meId}
-        players={players}
-        labels={labels}
-        onVote={onVote}
-      />
-    );
+    return <VotePhase state={state} meId={meId} labels={labels} onVote={onVote} />;
   }
   // capturing
   return (
@@ -336,136 +329,23 @@ function CapturePhase({
 function VotePhase({
   state,
   meId,
-  players,
   labels,
   onVote,
 }: {
   state: DisposableCameraState;
   meId: string;
-  players: SessionPlayer[];
   labels: Record<string, string>;
   onVote: Props["onVote"];
 }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const busyRef = useRef(false);
-  busyRef.current = busy;
-
-  const serverBallot = state.votes[meId] ?? [];
-  const limit = state.config.votesPerPlayer;
-
-  // Optimistic ballot: reflects the tap immediately so the ✓ + count update
-  // before the server round-trips (the prior code only showed ✓ once the
-  // polled state echoed, which read as "nothing happened" and drove double
-  // taps). We reconcile to the server ballot whenever the *server* value
-  // actually changes (and we're not mid-flight), so host edits / cross-device
-  // state still win — but a successful own-vote doesn't flicker the ✓ off
-  // while the next poll catches up.
-  const [optimistic, setOptimistic] = useState<string[]>(serverBallot);
-  const serverKey = serverBallot.join(",");
-  useEffect(() => {
-    if (!busyRef.current) setOptimistic(serverBallot);
-    // Keyed on serverKey only: reconcile when the server ballot changes, not on
-    // every busy toggle (which would briefly revert a just-cast vote).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverKey]);
-
-  const myBallot = optimistic;
-  const used = myBallot.length;
-
-  const toggle = async (photoId: string) => {
-    if (busy) return;
-    const photo = state.photos.find((p) => p.id === photoId);
-    if (!photo) return;
-    if (photo.uploaderId === meId) {
-      setError(labels.cantVoteOwn);
-      return;
-    }
-    let next: string[];
-    if (myBallot.includes(photoId)) {
-      next = myBallot.filter((id) => id !== photoId);
-    } else {
-      if (used >= limit) {
-        setError(labels.voteLimitReached);
-        return;
-      }
-      next = [...myBallot, photoId];
-    }
-    setOptimistic(next); // show ✓ + updated count right away
-    setBusy(true);
-    setError(null);
-    const r = await onVote(next);
-    setBusy(false);
-    if (!r.ok) {
-      setError(r.error ?? "Vote failed");
-      setOptimistic(serverBallot); // roll back the optimistic toggle
-    }
-  };
-
-  const nameOf = (id: string) =>
-    players.find((p) => p.user_id === id)?.display_name ?? "Someone";
-
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-baseline justify-between">
-        <h2
-          className="font-display font-bold text-2xl uppercase"
-          style={{ letterSpacing: "0.05em" }}
-        >
-          {labels.votingHeading}
-        </h2>
-        <span className="font-body text-sm text-ink/60">
-          {labels.votesUsed}:{" "}
-          <span className="font-display font-bold text-ink">
-            {used} / {limit}
-          </span>
-        </span>
-      </div>
-      {error && <p className="font-body text-red text-sm">{error}</p>}
-      {/* While a vote is in flight the whole grid dims + stops accepting taps,
-          so the action visibly registers and double-taps don't queue. */}
-      <div
-        aria-busy={busy}
-        className={`grid grid-cols-2 sm:grid-cols-3 gap-2 transition-opacity ${
-          busy ? "opacity-50 pointer-events-none" : ""
-        }`}
+      <h2
+        className="font-display font-bold text-2xl uppercase"
+        style={{ letterSpacing: "0.05em" }}
       >
-        {state.photos.map((p) => {
-          const voted = myBallot.includes(p.id);
-          const isOwn = p.uploaderId === meId;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => void toggle(p.id)}
-              disabled={busy || isOwn}
-              className={`relative aspect-square border-4 transition disabled:cursor-not-allowed ${
-                voted
-                  ? "border-yellow"
-                  : isOwn
-                    ? "border-ink/20 opacity-60"
-                    : "border-ink hover:border-yellow"
-              }`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt="" className="w-full h-full object-cover" />
-              {voted && (
-                <span className="absolute top-1 right-1 bg-yellow text-ink font-display font-bold text-base w-7 h-7 flex items-center justify-center">
-                  ✓
-                </span>
-              )}
-              {isOwn && (
-                <span className="absolute bottom-0 inset-x-0 bg-ink/80 text-cream text-xs py-0.5 font-display uppercase tracking-wider text-center">
-                  {labels.yoursTag}
-                </span>
-              )}
-              <span className="absolute top-1 left-1 bg-ink/70 text-cream text-xs px-1 font-body truncate max-w-[60%]">
-                {nameOf(p.uploaderId)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+        {labels.votingHeading}
+      </h2>
+      <DisposableSwipeVote state={state} meId={meId} labels={labels} onVote={onVote} />
     </div>
   );
 }

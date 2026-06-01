@@ -70,7 +70,7 @@ const EventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("disposable_photo_upload"), photoId: str(64), url: str(1000) }),
   z.object({ kind: z.literal("disposable_photo_delete"), photoId: str(64) }),
   z.object({ kind: z.literal("disposable_open_voting") }),
-  z.object({ kind: z.literal("disposable_vote"), photoIds: z.array(str(64)).max(50) }),
+  z.object({ kind: z.literal("disposable_vote"), photoIds: z.array(str(64)).max(500) }),
   z.object({ kind: z.literal("disposable_open_reveal") }),
   z.object({ kind: z.literal("disposable_end") }),
 ]);
@@ -749,6 +749,19 @@ export async function POST(
 
   if (body.kind === "disposable_vote") {
     const state = (await getGameState(game)) as DisposableCameraState;
+    // Voting-presence gate: capture can stay open (around-town contest) while
+    // party voting requires being in the venue. Members only; staff exempt.
+    const voteTier = state.config.votePresenceTier ?? 0;
+    if (player && !admin && player.presence_level < voteTier)
+      return NextResponse.json(
+        {
+          error:
+            voteTier >= PRESENCE.SESSION
+              ? "Scan tonight's QR code on the screen to vote."
+              : "Scan the REALITY QR code in the venue to vote.",
+        },
+        { status: 403 },
+      );
     const event: DisposableEvent = {
       kind: "disposable_vote",
       voterId: user.id,
