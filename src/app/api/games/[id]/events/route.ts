@@ -13,6 +13,10 @@ import type { BingoEvent, BingoState } from "@/games/bingo/state";
 import type { TargetHuntEvent, TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairEvent, SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundEvent, QuizRoundState } from "@/games/quiz-round/state";
+import type {
+  QuizScoreboardEvent,
+  QuizScoreboardState,
+} from "@/games/quiz-scoreboard/state";
 import type { KaraokeEvent, KaraokeQueueState } from "@/games/karaoke-queue/state";
 import type {
   DisposableCameraState,
@@ -25,6 +29,8 @@ import type {
 // zod was already a dependency; it just wasn't used here.
 const str = (max: number) => z.string().min(1).max(max);
 const idx = z.number().int().min(0).max(1000);
+// Scoreboard points / deltas — bounded to match clampScore() in the reducer.
+const score = z.number().int().min(-100000).max(100000);
 
 const EventSchema = z.discriminatedUnion("kind", [
   // Bingo
@@ -45,6 +51,13 @@ const EventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("quiz_round_end") }),
   z.object({ kind: z.literal("quiz_create_team"), name: str(40) }),
   z.object({ kind: z.literal("quiz_join_team"), teamId: str(64) }),
+  // Pub Quiz Scoreboard (host-run manual board)
+  z.object({ kind: z.literal("quiz_scoreboard_add_team"), name: str(40) }),
+  z.object({ kind: z.literal("quiz_scoreboard_rename_team"), teamId: str(64), name: str(40) }),
+  z.object({ kind: z.literal("quiz_scoreboard_set_score"), teamId: str(64), score: score }),
+  z.object({ kind: z.literal("quiz_scoreboard_adjust_score"), teamId: str(64), delta: score }),
+  z.object({ kind: z.literal("quiz_scoreboard_remove_team"), teamId: str(64) }),
+  z.object({ kind: z.literal("quiz_scoreboard_end") }),
   // Karaoke Queue
   z.object({ kind: z.literal("karaoke_submit"), songTitle: str(200) }),
   z.object({ kind: z.literal("karaoke_edit"), requestId: str(64), songTitle: str(200) }),
@@ -532,6 +545,117 @@ export async function POST(
       payload: { at: now },
     });
     await notifySession(game.session_id, "karaoke_end");
+    return NextResponse.json({ ok: true });
+  }
+
+  // ───────────── Pub Quiz Scoreboard ─────────────
+  if (body.kind === "quiz_scoreboard_add_team") {
+    const state = (await getGameState(game)) as QuizScoreboardState;
+    // Server-generated team id (clients never supply ids).
+    const teamId = crypto.randomUUID();
+    const event: QuizScoreboardEvent = {
+      kind: "quiz_scoreboard_add_team",
+      id: teamId,
+      name: body.name,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_scoreboard_add_team",
+      actorId: user.id,
+      targetId: null,
+      payload: { id: teamId, name: body.name, at: now },
+    });
+    await notifySession(game.session_id, "quiz_scoreboard_add_team");
+    return NextResponse.json({ ok: true, teamId });
+  }
+
+  if (body.kind === "quiz_scoreboard_rename_team") {
+    const state = (await getGameState(game)) as QuizScoreboardState;
+    const event: QuizScoreboardEvent = {
+      kind: "quiz_scoreboard_rename_team",
+      teamId: body.teamId,
+      name: body.name,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_scoreboard_rename_team",
+      actorId: user.id,
+      targetId: null,
+      payload: { teamId: body.teamId, name: body.name, at: now },
+    });
+    await notifySession(game.session_id, "quiz_scoreboard_rename_team");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (
+    body.kind === "quiz_scoreboard_set_score" ||
+    body.kind === "quiz_scoreboard_adjust_score"
+  ) {
+    const state = (await getGameState(game)) as QuizScoreboardState;
+    const event: QuizScoreboardEvent =
+      body.kind === "quiz_scoreboard_set_score"
+        ? { kind: body.kind, teamId: body.teamId, score: body.score, at: now }
+        : { kind: body.kind, teamId: body.teamId, delta: body.delta, at: now };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: body.kind,
+      actorId: user.id,
+      targetId: null,
+      payload:
+        body.kind === "quiz_scoreboard_set_score"
+          ? { teamId: body.teamId, score: body.score, at: now }
+          : { teamId: body.teamId, delta: body.delta, at: now },
+    });
+    await notifySession(game.session_id, body.kind);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "quiz_scoreboard_remove_team") {
+    const state = (await getGameState(game)) as QuizScoreboardState;
+    const event: QuizScoreboardEvent = {
+      kind: "quiz_scoreboard_remove_team",
+      teamId: body.teamId,
+      at: now,
+    };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_scoreboard_remove_team",
+      actorId: user.id,
+      targetId: null,
+      payload: { teamId: body.teamId, at: now },
+    });
+    await notifySession(game.session_id, "quiz_scoreboard_remove_team");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.kind === "quiz_scoreboard_end") {
+    const state = (await getGameState(game)) as QuizScoreboardState;
+    const event: QuizScoreboardEvent = { kind: "quiz_scoreboard_end", at: now };
+    const v = gt.validate(state, event, user.id, ctx);
+    if (!v.ok) return NextResponse.json({ error: v.reason }, { status: 400 });
+    await appendEvent({
+      id: crypto.randomUUID(),
+      gameId: game.id,
+      kind: "quiz_scoreboard_end",
+      actorId: user.id,
+      targetId: null,
+      payload: { at: now },
+    });
+    await notifySession(game.session_id, "quiz_scoreboard_end");
     return NextResponse.json({ ok: true });
   }
 

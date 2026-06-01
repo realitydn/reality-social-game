@@ -8,12 +8,14 @@ import { BingoGame } from "@/games/bingo";
 import { TargetHuntGame } from "@/games/target-hunt";
 import { SpeedPairGame } from "@/games/speed-pair";
 import { QuizRoundGame } from "@/games/quiz-round";
+import { QuizScoreboardGame } from "@/games/quiz-scoreboard";
 import { KaraokeQueueGame } from "@/games/karaoke-queue";
 import { DisposableCameraGame } from "@/games/disposable-camera";
 import type { BingoState } from "@/games/bingo/state";
 import type { TargetHuntState } from "@/games/target-hunt/state";
 import type { SpeedPairState } from "@/games/speed-pair/state";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { QuizScoreboardState } from "@/games/quiz-scoreboard/state";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import type { DisposableCameraState } from "@/games/disposable-camera/state";
 import { isLocale, type Locale } from "@/i18n/locales";
@@ -127,6 +129,7 @@ export default async function PlayerSessionPage({
         | TargetHuntState
         | SpeedPairState
         | QuizRoundState
+        | QuizScoreboardState
         | KaraokeQueueState
         | DisposableCameraState)
     : null;
@@ -136,6 +139,7 @@ export default async function PlayerSessionPage({
   const targetHuntLabels = TargetHuntGame.prompts(locale);
   const speedPairLabels = SpeedPairGame.prompts(locale);
   const quizRoundLabels = QuizRoundGame.prompts(locale);
+  const quizScoreboardLabels = QuizScoreboardGame.prompts(locale);
   const karaokeQueueLabels = KaraokeQueueGame.prompts(locale);
   const disposableCameraLabels = DisposableCameraGame.prompts(locale);
 
@@ -206,6 +210,7 @@ export default async function PlayerSessionPage({
             targetHuntLabels={targetHuntLabels}
             speedPairLabels={speedPairLabels}
             quizRoundLabels={quizRoundLabels}
+            quizScoreboardLabels={quizScoreboardLabels}
             karaokeQueueLabels={karaokeQueueLabels}
             disposableCameraLabels={disposableCameraLabels}
             noActiveGameMessage={t("noActiveGame")}

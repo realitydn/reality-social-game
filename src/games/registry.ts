@@ -3,6 +3,7 @@ import { BingoGame } from "./bingo";
 import { TargetHuntGame } from "./target-hunt";
 import { SpeedPairGame } from "./speed-pair";
 import { QuizRoundGame } from "./quiz-round";
+import { QuizScoreboardGame } from "./quiz-scoreboard";
 import { KaraokeQueueGame } from "./karaoke-queue";
 import { DisposableCameraGame } from "./disposable-camera";
 
@@ -13,6 +14,7 @@ const REGISTRY = {
   "target-hunt": TargetHuntGame,
   "speed-pair": SpeedPairGame,
   "quiz-round": QuizRoundGame,
+  "quiz-scoreboard": QuizScoreboardGame,
   "karaoke-queue": KaraokeQueueGame,
   "disposable-camera": DisposableCameraGame,
 } as const satisfies Record<string, GameType<unknown, unknown>>;
@@ -32,6 +34,7 @@ export const GAMES_REQUIRING_PACKAGE: ReadonlySet<string> = new Set([
 // reducer can lock host events to that user. Other games ignore seedData.
 export const HOST_DRIVEN_GAMES: ReadonlySet<string> = new Set([
   "quiz-round",
+  "quiz-scoreboard",
   "karaoke-queue",
   "disposable-camera",
 ]);
@@ -49,6 +52,7 @@ export const PLAYABLE_GAME_TYPES: { key: GameTypeKey; label: string }[] = [
   { key: "target-hunt", label: "Target Hunt" },
   { key: "speed-pair", label: "Speed Pair" },
   { key: "quiz-round", label: "Quiz Round" },
+  { key: "quiz-scoreboard", label: "Pub Quiz Scoreboard" },
   { key: "karaoke-queue", label: "Karaoke Queue" },
   { key: "disposable-camera", label: "Disposable Camera" },
 ];

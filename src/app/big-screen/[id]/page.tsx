@@ -9,11 +9,14 @@ import AttendeeList from "@/components/AttendeeList";
 import Leaderboard from "@/components/Leaderboard";
 import SessionRecap from "@/components/SessionRecap";
 import QuizRoundBigScreen from "@/components/QuizRoundBigScreen";
+import QuizScoreboardBigScreen from "@/components/QuizScoreboardBigScreen";
 import KaraokeQueueBigScreen from "@/components/KaraokeQueueBigScreen";
 import DisposableCameraBigScreen from "@/components/DisposableCameraBigScreen";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { QuizScoreboardState } from "@/games/quiz-scoreboard/state";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import type { DisposableCameraState } from "@/games/disposable-camera/state";
+import { REALITY_LINKS } from "@/lib/reality-links";
 
 // Big-screen / projector view. Public, no auth. Inverted REALITY palette
 // (ink ground + cream + a chromatic accent) for high contrast on the projector.
@@ -67,6 +70,7 @@ export default async function BigScreenPage({
   // the QR-plus-sidebar layout below.
   const fullScreenGame =
     game?.type === "quiz-round" ||
+    game?.type === "quiz-scoreboard" ||
     game?.type === "karaoke-queue" ||
     game?.type === "disposable-camera";
 
@@ -105,6 +109,14 @@ export default async function BigScreenPage({
               players,
               scores,
             }}
+          />
+        )}
+        {game?.type === "quiz-scoreboard" && (
+          <QuizScoreboardBigScreen
+            sessionId={session.id}
+            locale={locale}
+            initial={{ gameState: gameState as QuizScoreboardState | null }}
+            socialsQr={<QRCodeSVG value={REALITY_LINKS.socials} size={200} />}
           />
         )}
         {game?.type === "karaoke-queue" && (

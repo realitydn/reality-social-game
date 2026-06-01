@@ -5,9 +5,11 @@ import { getActiveGame, getGameState } from "@/lib/games";
 import { getCurrentUser } from "@/lib/session";
 import { HOST_DRIVEN_GAMES } from "@/games/registry";
 import type { QuizRoundState } from "@/games/quiz-round/state";
+import type { QuizScoreboardState } from "@/games/quiz-scoreboard/state";
 import type { KaraokeQueueState } from "@/games/karaoke-queue/state";
 import type { DisposableCameraState } from "@/games/disposable-camera/state";
 import HostControlPanel from "@/components/HostControlPanel";
+import QuizScoreboardHostPanel from "@/components/QuizScoreboardHostPanel";
 import KaraokeHostPanel from "@/components/KaraokeHostPanel";
 import DisposableHostPanel from "@/components/DisposableHostPanel";
 import Wordmark from "@/components/Wordmark";
@@ -103,6 +105,13 @@ export default async function SessionHostPage({
             gameId={game.id}
             initialState={rawState as QuizRoundState}
             initialPlayers={players}
+          />
+        )}
+        {game.type === "quiz-scoreboard" && (
+          <QuizScoreboardHostPanel
+            sessionId={id}
+            gameId={game.id}
+            initialState={rawState as QuizScoreboardState}
           />
         )}
         {game.type === "karaoke-queue" && (
