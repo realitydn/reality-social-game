@@ -5,6 +5,7 @@ import { getGame, getGameState } from "@/lib/games";
 import { findPlayerByCode, getPlayer } from "@/lib/sessions";
 import { isAdminEmail } from "@/lib/admin";
 import { PRESENCE, resolveGamePolicy } from "@/lib/presence";
+import { withinEventRateLimit } from "@/lib/rate-limit";
 import { appendEvent } from "@/lib/events";
 import { notifySession } from "@/lib/realtime";
 import { getGameType } from "@/games/registry";
@@ -139,6 +140,14 @@ export async function POST(
         { status: 403 },
       );
   }
+
+  // Per-actor rate limit on event POSTs — throttles a bot/griefer farming valid
+  // events (claims, votes). Players only; admins + the game host are exempt.
+  if (isMember && !admin && !(await withinEventRateLimit(game.id, user.id)))
+    return NextResponse.json(
+      { error: "You're going too fast — give it a sec." },
+      { status: 429 },
+    );
 
   const raw = await req.json().catch(() => null);
   const parsed = raw == null ? null : EventSchema.safeParse(raw);
