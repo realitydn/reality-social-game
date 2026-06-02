@@ -57,23 +57,36 @@ So the shape of an evening is: **create the session → players join → start a
 
 You're now on the session page. This is your control desk for the night.
 
-### B. Get the two screens up
+### B. Get the screen up, and the join codes
 
-From the session page, two links open in new tabs:
+Put **Open big screen ↗** on the TV / projector — it shows the live leaderboard and who's in the room, and takes over the screen when a quiz, karaoke set, or photo game runs. Open it once and leave it.
 
-- **Open big screen ↗** — put this on the TV / projector. It shows the live leaderboard and who's in the room, and automatically takes over the screen when a quiz, karaoke set, or photo game is running. Open it once and leave it.
-- **Player link ↗** — this is the page guests land on. Turn it into a **QR code** (any free QR generator, pointed at the link) and put it on tables, the bar, the door. Guests scan → enter a display name (or sign in with Google) → they're in. They can keep trickling in all night; no need to wait for everyone.
+Players get into tonight's session three ways:
+
+- **The projector QR** — shown on the big screen ("scan to join"). Because it's tied to tonight's session, scanning it also marks them **present in the room**.
+- **A printed venue QR** — make one pointing at **`https://app.realitydn.com/here`** and stick copies around the space (bar, tables, door). It always resolves to whatever night is live, so you print it **once** and reuse it forever. Scanning it joins them *and* marks them present — no marching up to the projector. (The **Player link ↗** button gives you the raw join URL if you'd rather roll your own QR.)
+- **From the menu** — a signed-in regular can tap **"Join tonight's game"** on the home screen. Quick, but it does **not** prove they're in the room (see Presence).
+
+**Presence — "are they actually here?"** Some games only work if people are physically present, so each game carries a **presence requirement** (set when you start it):
+
+- **Not required** — anyone who joined can play (trivia, or the around-town photo contest).
+- **In venue** — they must have scanned a venue QR (`/here`) or the projector QR. The meeting games default to this; a menu-joiner gets a gentle "scan the QR in the venue to play" until they do.
+- **This session** — must have scanned *tonight's* projector QR specifically (the strongest proof).
+
+It's a soft backstop, not a lock — the meeting games also need a real person to confirm each interaction — but it keeps menu-joiners from scoring those without showing up.
 
 ### C. Start a game
 
 On the session page, under **Game**, you'll see a button for each game.
 
-- **Bingo, Target Hunt, Speed Pair** — one tap to start. These need no setup.
-- **Disposable Camera** — set *Photos per player*, *Camera* (front / back / either), and *Votes per player*, pick a **Host**, then **Start**.
+- **Bingo, Target Hunt, Speed Pair** — one tap to start. (They default to **In venue** presence.)
+- **Disposable Camera** — set *Photos per player*, *Camera* (front / back / either), and *Votes per player*; choose **Unlimited** likes or keep the votes budget; set **Voting** presence (where people may vote from); pick a **Host**; **Start**. For the merch contest see §4.
 - **Quiz Round** — pick a **package** (the questions, written ahead of time — see §5), pick a **Host**, tick **Teams** if you want Pub Quiz team play, then **Start**.
 - **Karaoke Queue** — pick a **Host**, then **Start**.
 
 The **Host** picker decides who gets the live control panel for that game. Leave it on **Me / default** to run it yourself, or pick a staffer (e.g. Sam) to hand them the controls without making them an admin.
+
+The Disposable Camera and Quiz Round forms also carry a **Presence** dropdown (Not required / In venue / This session) and an **Account only** toggle. Leave the defaults for a normal night; reach for them for the contest below, or to lock quiz answering to people actually in the room. ("**Account**" = someone signed in with Google, as opposed to an anonymous guest.)
 
 ### D. While a game is running
 
@@ -119,10 +132,18 @@ You're the queue master. Players submit one song each; you control the running o
 A three-phase photo game. You move it through the phases:
 
 1. **Capturing** — players shoot photos on their phones (up to the per-player limit you set). You can delete any inappropriate shot from the grid during this phase. When enough are in, tap **Open voting →**.
-2. **Voting** — capture closes; everyone votes for their favourites. You'll see ballots coming in. When you're ready, tap **Reveal results →** (it'll tell you if turnout is still low).
+2. **Voting** — capture closes; players **swipe** through the photos on their phones — **right to like, left to skip** (there are tap buttons too). Depending on what you set at start, each like is a point (**Unlimited**) or they spend a fixed votes budget. You'll see ballots coming in; tap **Reveal results →** when ready (it warns you if turnout's still low).
 3. **Revealed** — the top photos take over the big screen as "Photographers of the Night," with names and vote counts. Tap **End game** to close it out.
 
 **End early** is always available if you need to wrap up fast.
+
+**The around-town merch contest.** Disposable doubles as a contest where people shoot photos *out in town* (say, wearing REALITY merch) over a few days, then everyone gathers to vote at a party. Start Disposable Camera with:
+
+- **Presence: Not required** + **Account only** — any signed-in Account can submit from anywhere; anonymous guests can't (so you know who entered).
+- **Voting: In venue** (or *This session*) — only people who actually showed up to the party can vote.
+- **Unlimited** likes for a pure popularity contest, or a budget to force harder choices.
+
+Keep the **one session open** across the whole contest — don't end it until after the party. The photos and the winners' reveal live on it the entire time. Players submit by opening the app and tapping **"Join tonight's game,"** then shooting from the capture screen.
 
 ---
 
@@ -176,9 +197,11 @@ A few things worth knowing:
 | **Speed Pair** | Auto-paired with someone; both tap "done"; re-paired with someone new. | Yes — point per meeting. | No |
 | **Quiz Round** | Answer host-run trivia on their phones; faster = more points. Optional teams. | Yes | Yes |
 | **Karaoke Queue** | Submit a song; host runs the running order. | No | Yes |
-| **Disposable Camera** | Shoot a few photos, then vote on everyone's. | No (but feeds Paparazzi board) | Yes |
+| **Disposable Camera** | Shoot photos, then **swipe** to vote on everyone's (right = like, left = skip). Doubles as an around-town merch contest. | No (but feeds Paparazzi board) | Yes |
 
 Every player has a **4-character code** on their own screen — that's what others type in to claim a Bingo square or confirm a tag. Tell guests where to find it if they look lost.
+
+Most games are open to anyone who's joined; the meeting games (Bingo, Target Hunt, Speed Pair) want players **in the room** — see **Presence** in §3.B.
 
 ---
 
@@ -189,6 +212,7 @@ Every player has a **4-character code** on their own screen — that's what othe
 - **Keep the floor smooth.** The games are a layer *on top of* a normal night at REALITY — they shouldn't pull bartenders off drinks or turn into anything that gets in the way of service. If a game is creating friction on the floor, end it and move on.
 - **If something looks stuck**, the screens refresh themselves every few seconds — give it a moment before reloading. A full browser refresh on the big screen or your control panel fixes almost everything; nobody loses their place or their score.
 - **Scores are safe.** Switching or ending a game always saves its scores first. You can't lose points by moving between games.
+- **Two messages players might ask about.** *"Scan the QR in the venue to play this"* means they joined from the menu but the game needs them in the room — point them at a printed venue QR. *"You're going too fast — give it a sec"* is the anti-spam limit; normal tapping and swiping never trips it.
 
 ---
 
@@ -199,7 +223,9 @@ Every player has a **4-character code** on their own screen — that's what othe
 | Start the night | `/admin` | **+ New session** |
 | Put the leaderboard on the TV | session page | **Open big screen ↗** |
 | Let guests join | session page | **Player link ↗** → make a QR |
+| Print a reusable venue QR | (any generator) | a QR to `app.realitydn.com/here` — joins + marks present |
 | Start a game | session page | the game's **Start** button |
+| Run the merch photo contest | session page | Disposable: **Account only**, **Voting: in venue** |
 | Hand a game to a host | session page | pick them in the **Host** droppicker before starting |
 | Run my game live | session page | **Host control →** |
 | Write a quiz | `/host` | **+ New package** |
